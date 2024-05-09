@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Resonant.js Quick Demo</title>
+    <script src="resonant.js"></script>
+</head>
+<body>
+<h1>Resonant.js Quick Demo</h1>
+
+<!-- Display and update a single item -->
+<div>
+    <h2>Counter</h2>
+    <p>
+        Current count: <span res="counter"></span>
+    </p>
+    <button onclick="incrementCounter()">Increment Counter</button>
+</div>
+
+<!-- Demonstrate object property binding -->
+<div>
+    <h2>Person Information</h2>
+    <div res="person">
+        <span res-prop="firstname"></span>
+        <span res-prop="lastname"></span>
+        <br/>
+        <br/>
+
+        First Name: <input type="text" res-prop="firstname" />
+        Last Name: <input type="text" res-prop="lastname" />
+    </div>
+</div>
+
+<!-- Demonstrate dynamic list rendering -->
+<div>
+    <h2>Team Members</h2>
+    <ul res="team">
+        <li>
+            <span res-prop="name"></span> - <span res-prop="role"></span>
+        </li>
+    </ul>
+    <button onclick="addTeamMember()">Add Team Member</button>
+</div>
+
+<script>
+    const resonantJs = new Resonant();
+
+    // Initialize a counter
+    resonantJs.add("counter", 0);
+
+    function exampleCallbackOutput(result) {
+        console.log(result.firstname + " " + result.lastname);
+    }
+
+    // Initialize a single person object
+    resonantJs.add("person", {
+        firstname: "Andy",
+        lastname: "Murgola"
+    });
+
+    // Initialize a list of people with dynamic properties
+    resonantJs.add("team", [
+        { name: "Alice", role: "Developer" },
+        { name: "Bob", role: "Designer" }
+    ]);
+
+    // Example of a callback
+    resonantJs.addCallback("person", exampleCallbackOutput);
+
+    function incrementCounter() {
+        counter++;
+    }
+
+    function updatePersonInfo(prop, value) {
+        person[prop] = value;
+    }
+
+    function addTeamMember() {
+        const newMember = { name: "Charlie", role: "Product Manager" };
+        team.push(newMember);
+    }
+</script>
+</body>
+</html>
