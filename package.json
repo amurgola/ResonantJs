@@ -1,0 +1,19 @@
+{
+  "name": "resonantjs",
+  "version": "1.0.0",
+  "description": "A lightweight JavaScript framework that enables reactive data-binding for building dynamic and responsive web applications. It simplifies creating interactive UIs by automatically updating the DOM when your data changes.",
+  "main": "resonant.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amurgola/ResonantJs.git"
+  },
+  "author": "Andrew Paul Murgola (andy@murgo.la)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/amurgola/ResonantJs/issues"
+  },
+  "homepage": "https://github.com/amurgola/ResonantJs#readme",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
