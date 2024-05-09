@@ -10,6 +10,24 @@ Resonant.js is an open-source lightweight JavaScript framework that enables reac
 - **Lightweight and Easy to Integrate**: Minimal setup required to get started.
 - **Compatible with Modern Browsers**: Works seamlessly across all modern web browsers.
 
+## Installation
+## NPM
+To install via NPM, use the following command:
+
+```bash 
+npm i resonantjs
+```
+
+## CDN
+To use via CDN, include the following URLs in your HTML file:
+
+```html 
+<script src="https://unpkg.com/resonantjs@latest/resonant.js"></script>
+```
+
+## Demo
+![](https://github.com/amurgola/ResonantJs/blob/main/Demo.gif)
+
 ## Usage
 Include resonant.js in your HTML file, and use the following example to understand how to integrate it into your web application.
 
@@ -18,7 +36,7 @@ Include resonant.js in your HTML file, and use the following example to understa
 <html lang="en">
 <head>
     <title>Resonant.js Quick Demo</title>
-    <script src="./resonant.js"></script>
+    <script src="https://unpkg.com/resonantjs@latest/resonant.js"></script>
 </head>
 <body>
     <h1>Resonant.js Quick Demo</h1>
