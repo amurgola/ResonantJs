@@ -7,6 +7,7 @@ Resonant.js is an open-source lightweight JavaScript framework that enables reac
 - **Reactive Data Binding**: Automatically synchronize your data with the UI.
 - **Dynamic List Rendering**: Easily render lists that react to data changes.
 - **Bidirectional Input Binding**: Bind HTML input fields directly to your data model.
+- **Efficient Conditional Updates**: Only evaluate conditional expressions tied to specific variable changes.
 - **Lightweight and Easy to Integrate**: Minimal setup required to get started.
 - **Compatible with Modern Browsers**: Works seamlessly across all modern web browsers.
 
@@ -39,76 +40,78 @@ Include resonant.js in your HTML file, and use the following example to understa
     <script src="https://unpkg.com/resonantjs@latest/resonant.js"></script>
 </head>
 <body>
-    <h1>Resonant.js Quick Demo</h1>
+  <h1>Resonant.js Quick Demo</h1>
 
-    <!-- Display and update a single item -->
-    <div>
-        <h2>Counter</h2>
-        <p>Current count: <span res="counter"></span></p>
-        <button onclick="incrementCounter()">Increment Counter</button>
+  <!-- Display and update a single item -->
+  <div>
+    <h2>Counter</h2>
+    <p>
+      Current count: <span res="counter"></span>
+    </p>
+    <div res-conditional="counter >= 5">
+      Only shows when counter is greater than or equal to 5
     </div>
+    <button onclick="counter++">Increment Counter</button>
+  </div>
 
-    <!-- Demonstrate object property binding -->
-    <div>
-        <h2>Person Information</h2>
-        <div res="person">
-            <span res-prop="firstname"></span>
-            <span res-prop="lastname"></span>
-            <br/><br/>
-            First Name: <input type="text" res-prop="firstname">
-            Last Name: <input type="text" res-prop="lastname">
-        </div>
+  <!-- Demonstrate object property binding -->
+  <div>
+    <h2>Person Information</h2>
+    <div res="person">
+      <span res-prop="firstname"></span>
+      <span res-prop="lastname"></span>
+      <br/>
+      <div res-conditional="person.firstname == 'Andrew' && person.lastname == 'Murgola'">
+        Only shows when firstname is Andrew and lastname is Murgola
+      </div>
+      <br/>
+
+      First Name: <input type="text" res-prop="firstname" />
+      Last Name: <input type="text" res-prop="lastname" />
     </div>
+  </div>
 
-    <!-- Demonstrate dynamic list rendering -->
-    <div>
-        <h2>Team Members</h2>
-        <ul res="team">
-            <li>
-                <span res-prop="name"></span> - <span res-prop="role"></span>
-            </li>
-        </ul>
-        <button onclick="addTeamMember()">Add Team Member</button>
-    </div>
+  <!-- Demonstrate dynamic list rendering -->
+  <div>
+    <h2>Team Members</h2>
+    <ul res="team">
+      <li>
+        <span res-prop="name"></span> - <span res-prop="role"></span>
+      </li>
+    </ul>
+    <button onclick="addTeamMember()">Add Team Member</button>
+  </div>
 
-    <script>
-        const resonantJs = new Resonant();
+  <script>
+    const resonantJs = new Resonant();
 
-        // Initialize a counter
-        resonantJs.add("counter", 0);
+    // Initialize a counter
+    resonantJs.add("counter", 0);
 
-        // Initialize a single person object
-        resonantJs.add("person", {
-          firstname: "Andy",
-          lastname: "Murgola"
-        });
+    // Initialize a single object
+    resonantJs.add("person", {
+      firstname: "Andrew",
+      lastname: "Murgola"
+    });
 
-        // Example of a callback
-        resonantJs.addCallback("person", exampleCallbackOutput);
+    // Initialize an array of objects
+    resonantJs.add("team", [
+      { name: "Alice", role: "Developer" },
+      { name: "Bob", role: "Designer" }
+    ]);
 
-        // Initialize a list of people with dynamic properties
-        resonantJs.add("team", [
-          { name: "Alice", role: "Developer" },
-          { name: "Bob", role: "Designer" }
-        ]);
+    // Example of a callback
+    resonantJs.addCallback("person", (result) => {
+      console.log(result.firstname + " " + result.lastname);
+    });
 
-        function incrementCounter() {
-          counter++;
-        }
-
-        function addTeamMember() {
-          const newMember = { name: "Charlie", role: "Product Manager" };
-          team.push(newMember);
-        }
-
-        function exampleCallbackOutput(result) {
-          console.log(result.firstname + " " + result.lastname);
-        }
-
-    </script>
+    function addTeamMember() {
+      const newMember = { name: "Charlie", role: "Product Manager" };
+      team.push(newMember);
+    }
+  </script>
 </body>
 </html>
-
 ```
 ## Features Overview
 
@@ -116,7 +119,7 @@ Include resonant.js in your HTML file, and use the following example to understa
 - **`res` and `res-prop` Attributes**: Bind HTML elements to your data model seamlessly.
     - `res` is used to identify an overarching data model.
     - `res-prop` links individual properties within that model to corresponding UI elements.
-
+- **`res-conditional` Attribute**: Conditionally display elements based on the data model's properties.
 - **Automatic UI Updates**: Changes to your JavaScript objects instantly reflect in the associated UI components, reducing manual DOM manipulation.
 
 ### Advanced Features

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <title>Resonant.js Quick Demo</title>
-    <script src="https://unpkg.com/resonantjs@latest/resonant.js"></script>
+    <script src="resonant.js"></script>
 </head>
 <body>
 <h1>Resonant.js Quick Demo</h1>
@@ -13,7 +13,10 @@
     <p>
         Current count: <span res="counter"></span>
     </p>
-    <button onclick="incrementCounter()">Increment Counter</button>
+    <div res-conditional="counter >= 5">
+        Only shows when counter is greater than or equal to 5
+    </div>
+    <button onclick="counter++">Increment Counter</button>
 </div>
 
 <!-- Demonstrate object property binding -->
@@ -23,6 +26,9 @@
         <span res-prop="firstname"></span>
         <span res-prop="lastname"></span>
         <br/>
+        <div res-conditional="person.firstname == 'Andrew' && person.lastname == 'Murgola'">
+            Only shows when firstname is Andrew and lastname is Murgola
+        </div>
         <br/>
 
         First Name: <input type="text" res-prop="firstname" />
@@ -47,32 +53,22 @@
     // Initialize a counter
     resonantJs.add("counter", 0);
 
-    function exampleCallbackOutput(result) {
-        console.log(result.firstname + " " + result.lastname);
-    }
-
-    // Initialize a single person object
+    // Initialize a single object
     resonantJs.add("person", {
-        firstname: "Andy",
+        firstname: "Andrew",
         lastname: "Murgola"
     });
 
-    // Initialize a list of people with dynamic properties
+    // Initialize an array of objects
     resonantJs.add("team", [
         { name: "Alice", role: "Developer" },
         { name: "Bob", role: "Designer" }
     ]);
 
     // Example of a callback
-    resonantJs.addCallback("person", exampleCallbackOutput);
-
-    function incrementCounter() {
-        counter++;
-    }
-
-    function updatePersonInfo(prop, value) {
-        person[prop] = value;
-    }
+    resonantJs.addCallback("person", (result) => {
+        console.log(result.firstname + " " + result.lastname);
+    });
 
     function addTeamMember() {
         const newMember = { name: "Charlie", role: "Product Manager" };

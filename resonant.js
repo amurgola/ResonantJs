@@ -33,6 +33,7 @@ class Resonant {
             set: (target, property, value) => {
                 target[property] = value;
                 this.updateElement(parentName);
+                this.updateConditionalsFor(parentName);
                 return true;
             }
         });
@@ -41,7 +42,7 @@ class Resonant {
     _createArray(variableName, arr) {
         return new Proxy(arr, {
             get: (target, index) => {
-                if (typeof target[index] === 'object') {
+                if (typeof target[index] === 'object' && !target[index][Symbol('isProxy')]) {
                     target[index] = this._createObject(`${variableName}[${index}]`, target[index]);
                 }
                 return target[index];
@@ -49,6 +50,7 @@ class Resonant {
             set: (target, index, value) => {
                 target[index] = value;
                 this.updateElement(variableName);
+                this.updateConditionalsFor(variableName);
                 return true;
             }
         });
@@ -60,6 +62,7 @@ class Resonant {
             set: (newValue) => {
                 this._assignValueToData(variableName, newValue);
                 this.updateElement(variableName);
+                this.updateConditionalsFor(variableName);
             }
         });
     }
@@ -91,11 +94,29 @@ class Resonant {
             }
         });
 
+        // Call the variable-specific condition update
+        this.updateConditionalsFor(variableName);
+
         if (this.callbacks[variableName]) {
             this.callbacks[variableName](value);
         }
     }
 
+    updateConditionalsFor(variableName) {
+        const conditionalElements = document.querySelectorAll(`[res-conditional*="${variableName}"]`);
+        conditionalElements.forEach(conditionalElement => {
+            const condition = conditionalElement.getAttribute('res-conditional');
+            try {
+                if (eval(condition)) {
+                    conditionalElement.style.display = '';
+                } else {
+                    conditionalElement.style.display = 'none';
+                }
+            } catch (e) {
+                console.error(`Error evaluating condition for ${variableName}: ${condition}`, e);
+            }
+        });
+    }
 
     _renderArray(variableName, el) {
         let template = el.cloneNode(true);
