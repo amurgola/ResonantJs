@@ -21,7 +21,7 @@
         <li>
             <input type="checkbox" res-prop="done" />
             <span res-prop="name"></span>
-            <button res-onclick-remove="name">Remove</button>
+            <button res-onclick="remove">Remove</button>
         </li>
     </ul>
 </div>
@@ -42,6 +42,13 @@
     resonantJs.addCallback("tasks", (tasks, task, action) => {
         console.log(`Action taken: ${action} for ${task.name}`);
     });
+
+    function remove(task) {
+        const index = tasks.indexOf(task);
+        tasks.splice(index, 1);
+
+        //You could use res-onclick-remove="name" as well, still trying to figure out if I want to leave this or not
+    }
 
     // Add a function to add a new task
     function addTask() {
