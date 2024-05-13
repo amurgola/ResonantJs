@@ -10,7 +10,6 @@ Resonant.js is an open-source lightweight JavaScript framework that enables reac
 - **Efficient Conditional Updates**: Only evaluate conditional expressions tied to specific variable changes.
 - **Lightweight and Easy to Integrate**: Minimal setup required to get started.
 - **Compatible with Modern Browsers**: Works seamlessly across all modern web browsers.
-
 ## Installation
 ## NPM
 To install via NPM, use the following command:
@@ -32,87 +31,29 @@ To use via CDN, include the following URLs in your HTML file:
 ## Usage
 Include resonant.js in your HTML file, and use the following example to understand how to integrate it into your web application.
 
-```javascript
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Resonant.js Quick Demo</title>
-    <script src="https://unpkg.com/resonantjs@latest/resonant.js"></script>
+  <title>Resonant.js Basic Example</title>
+  <script src="https://unpkg.com/resonantjs@latest/resonant.js"></script>
 </head>
 <body>
-  <h1>Resonant.js Quick Demo</h1>
+<h1>Resonant.js Basic Example</h1>
+<div>
+  <h2>Counter</h2>
+  <p>Current count: <span res="counter"></span></p>
+  <button onclick="counter++">Increment Counter</button>
+</div>
 
-  <!-- Display and update a single item -->
-  <div>
-    <h2>Counter</h2>
-    <p>
-      Current count: <span res="counter"></span>
-    </p>
-    <div res-conditional="counter >= 5">
-      Only shows when counter is greater than or equal to 5
-    </div>
-    <button onclick="counter++">Increment Counter</button>
-  </div>
-
-  <!-- Demonstrate object property binding -->
-  <div>
-    <h2>Person Information</h2>
-    <div res="person">
-      <span res-prop="firstname"></span>
-      <span res-prop="lastname"></span>
-      <br/>
-      <div res-conditional="person.firstname == 'Andrew' && person.lastname == 'Murgola'">
-        Only shows when firstname is Andrew and lastname is Murgola
-      </div>
-      <br/>
-
-      First Name: <input type="text" res-prop="firstname" />
-      Last Name: <input type="text" res-prop="lastname" />
-    </div>
-  </div>
-
-  <!-- Demonstrate dynamic list rendering -->
-  <div>
-    <h2>Team Members</h2>
-    <ul res="team">
-      <li>
-        <span res-prop="name"></span> - <span res-prop="role"></span>
-      </li>
-    </ul>
-    <button onclick="addTeamMember()">Add Team Member</button>
-  </div>
-
-  <script>
-    const resonantJs = new Resonant();
-
-    // Initialize a counter
-    resonantJs.add("counter", 0);
-
-    // Initialize a single object
-    resonantJs.add("person", {
-      firstname: "Andrew",
-      lastname: "Murgola"
-    });
-
-    // Initialize an array of objects
-    resonantJs.add("team", [
-      { name: "Alice", role: "Developer" },
-      { name: "Bob", role: "Designer" }
-    ]);
-
-    // Example of a callback
-    resonantJs.addCallback("person", (result) => {
-      console.log(result.firstname + " " + result.lastname);
-    });
-
-    function addTeamMember() {
-      const newMember = { name: "Charlie", role: "Product Manager" };
-      team.push(newMember);
-    }
-  </script>
+<script>
+  const resonantJs = new Resonant();
+  resonantJs.add("counter", 0);
+</script>
 </body>
 </html>
 ```
+
 ## Features Overview
 
 ### Core Concepts
@@ -120,6 +61,8 @@ Include resonant.js in your HTML file, and use the following example to understa
     - `res` is used to identify an overarching data model.
     - `res-prop` links individual properties within that model to corresponding UI elements.
 - **`res-conditional` Attribute**: Conditionally display elements based on the data model's properties.
+- **`res-onclick` Attribute**: Triggers a function when an element is clicked, allowing for custom event handling.
+- **`res-onclick-remove` Attribute**: Removes an item from an array when the associated element is clicked.
 - **Automatic UI Updates**: Changes to your JavaScript objects instantly reflect in the associated UI components, reducing manual DOM manipulation.
 
 ### Advanced Features
@@ -127,10 +70,80 @@ Include resonant.js in your HTML file, and use the following example to understa
 - **Event Callbacks**: Register custom functions to execute whenever your data model changes.
 - **Bidirectional Input Binding**: Bind form input fields directly to your data, making two-way synchronization simple.
 
-### Example Applications
-- **Single-Page Applications**: Build dynamic and responsive single-page applications quickly.
-- **Admin Dashboards**: Create data-rich dashboards that reflect real-time changes in your database.
-- **Form-Based Applications**: Automate forms, surveys, and user profiles for seamless data entry.
+### New Features in Version 1.0.2
+
+#### Pending Updates Mechanism
+- Introduced to prevent redundant updates and ensure callbacks are only triggered once per update cycle, improving performance and user experience.
+
+#### Callback Parameter Enhancement
+- Callbacks now receive detailed parameters including the specific action taken (`added`, `modified`, `removed`), the item affected, and the previous value. This provides better context for handling updates.
+
+#### Batched Updates for Object Properties
+- Improved handling of object property updates to ensure changes are batched together, preventing multiple redundant callback triggers.
+
+#### Refined Data Binding
+- Enhanced data binding between model and view to ensure consistent synchronization without unnecessary updates.
+
+### Task Manager Example
+
+Here is an example of a task manager application using Resonant.js:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Resonant.js Task Manager Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/resonantjs@latest/dist/resonant.min.js"></script>
+</head>
+<body>
+<h1>Resonant.js Task Manager Demo</h1>
+
+<!-- Task Input -->
+<div>
+    <h2>Add New Task</h2>
+    <input type="text" placeholder="Task Name" res="taskName" />
+    <button onclick="addTask()">Add Task</button>
+</div>
+
+<!-- Task List -->
+<div>
+    <h2>Task List</h2>
+    <ul res="tasks">
+        <li>
+            <input type="checkbox" res-prop="done" />
+            <span res-prop="name"></span>
+            <button res-onclick-remove="name">Remove</button>
+        </li>
+    </ul>
+</div>
+
+<script>
+    const resonantJs = new Resonant();
+
+    // Initialize variables using a configuration object
+    resonantJs.addAll({
+        tasks: [
+            { name: "Task 1", done: false },
+            { name: "Task 2", done: true }
+        ],
+        taskName: ""
+    });
+
+    // Add a callback to log actions taken on tasks
+    resonantJs.addCallback("tasks", (tasks, task, action) => {
+        console.log(`Action taken: ${action} for ${task.name}`);
+    });
+
+    // Add a function to add a new task
+    function addTask() {
+        const newTask = { name: taskName, done: false };
+        tasks.push(newTask);
+        taskName = '';
+    }
+</script>
+</body>
+</html>
+```
 
 ## Future Enhancements
 
