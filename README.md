@@ -145,11 +145,8 @@ Here is an example of a task manager application using Resonant.js:
 </html>
 ```
 
-## Future Enhancements
-
-- [ ] Support for nested data structures with deep linking.
-- [ ] Advanced filtering and sorting methods for arrays.
-- [ ] Compatibility with popular JavaScript frameworks.
+## Other Information
+- The demo HTML file uses the Pico CSS framework for styling. You can find more information about Pico CSS [here](https://picocss.com/).
 
 ## License
 

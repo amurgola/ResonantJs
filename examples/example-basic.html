@@ -2,52 +2,85 @@
 <html lang="en">
 <head>
     <title>Resonant.js Practical Demo</title>
-    <script src="../resonant.js"></script>
+    <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css"
+    />
+    <script src="https://unpkg.com/resonantjs@latest/resonant.min.js"></script>
+    <style>
+        section.grid {
+            padding: 1rem;
+            margin-bottom: 2rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 0.5rem;
+        }
+        .conditional {
+            font-style: italic;
+            color: #888;
+        }
+    </style>
 </head>
 <body>
-<h1>Resonant.js Practical Demo</h1>
 
-<!-- Display and update a single item -->
-<div>
-    <h2>Counter</h2>
-    <p>
-        Current count: <span res="counter"></span>
-    </p>
-    <div res-conditional="counter < 10">
-        Only shows when counter is less than 10
-    </div>
-    <div res-conditional="counter >= 10">
-        Only shows when counter is greater than or equal to 10
-    </div>
-    <button onclick="counter++">Increment Counter</button>
-</div>
+<main class="container">
+    <h1>Resonant.js Basic Demo</h1>
 
-<!-- Demonstrate object property binding -->
-<div>
-    <h2>User Information</h2>
-    <div res="user">
-        <span res-prop="firstname"></span>
-        <span res-prop="lastname"></span>
-        <br/>
-        <div res-conditional="user.firstname == 'John' && user.lastname == 'Doe'">
-            Only shows when firstname is John and lastname is Doe
+    <!-- Display and update a single item -->
+    <section class="grid">
+        <div>
+            <h2>Counter: <span res="counter"></span></h2>
+            <div res-conditional="counter < 10" class="conditional">
+                Only shows when counter is less than 10
+            </div>
+            <div res-conditional="counter >= 10" class="conditional">
+                Only shows when counter is greater than or equal to 10
+            </div>
         </div>
-        <br/>
-        First Name: <input type="text" res-prop="firstname" />
-        Last Name: <input type="text" res-prop="lastname" />
-    </div>
-</div>
 
-<!-- Demonstrate dynamic list rendering -->
-<div>
-    <h2>Project Members</h2>
-    <ul res="projectTeam">
-        <li>
-            <span res-prop="name"></span> - <span res-prop="role"></span>
-        </li>
-    </ul>
-    <button onclick="addProjectMember()">Add Project Member</button>
-</div>
+        <button onclick="counter++">Increment Counter</button>
+    </section>
+
+    <!-- Demonstrate object property binding -->
+    <section class="grid" res="user">
+        <div>
+            <h2>User Information</h2>
+            <div res-conditional="user.firstname == 'John' && user.lastname == 'Doe'" class="conditional">
+                Only shows when firstname is John and lastname is Doe
+            </div>
+
+            <p>
+                <span res-prop="firstname"></span>
+                <span res-prop="lastname"></span>
+            </p>
+        </div>
+
+        <div>
+
+            <div class="form-group">
+                <label>First Name:
+                    <input type="text" res-prop="firstname" />
+                </label>
+                <label>Last Name:
+                    <input type="text" res-prop="lastname" />
+                </label>
+            </div>
+        </div>
+    </section>
+
+    <!-- Demonstrate dynamic list rendering -->
+    <section class="grid">
+        <div>
+            <h2>Project Members</h2>
+            <ul res="projectTeam">
+                <li>
+                    <span res-prop="name"></span> - <span res-prop="role"></span>
+                </li>
+            </ul>
+        </div>
+
+        <button onclick="addProjectMember()">Add Project Member</button>
+    </section>
+</main>
 
 <script>
     const resonantJs = new Resonant();
