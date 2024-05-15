@@ -76,6 +76,7 @@ class Resonant {
                 this._triggerCallbacks(variableName, action, item, property, oldValue);
                 this.updateElement(variableName);
                 this.updateConditionalsFor(variableName);
+                this.updateStylesFor(variableName);
             }, 0);
         }
     }
@@ -93,6 +94,7 @@ class Resonant {
                 this._assignValueToData(variableName, newValue);
                 this.updateElement(variableName);
                 this.updateConditionalsFor(variableName);
+                this.updateStylesFor(variableName);
                 if (!Array.isArray(newValue) && typeof newValue !== 'object') {
                     this._queueUpdate(variableName, 'modified', this.data[variableName]);
                 }
@@ -110,6 +112,7 @@ class Resonant {
                     element.value = value;
                     element.oninput = () => {
                         this.data[variableName] = element.value;
+                        this._queueUpdate(variableName, 'modified', this.data[variableName]);
                     };
                     element.setAttribute('data-resonant-bound', 'true');
                 }
@@ -138,6 +141,16 @@ class Resonant {
                                 subEl.innerHTML = value[key];
                             }
                             subEl.setAttribute('data-resonant-bound', 'true');
+                        } else {
+                            if (subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') {
+                                if (subEl.type === 'checkbox') {
+                                    subEl.checked = value[key];
+                                } else {
+                                    subEl.value = value[key];
+                                }
+                            } else {
+                                subEl.innerHTML = value[key];
+                            }
                         }
                     }
                 });
@@ -147,6 +160,7 @@ class Resonant {
         });
 
         this.updateConditionalsFor(variableName);
+        this.updateStylesFor(variableName);
     }
 
     updateConditionalsFor(variableName) {
@@ -161,6 +175,23 @@ class Resonant {
                 }
             } catch (e) {
                 console.error(`Error evaluating condition for ${variableName}: ${condition}`, e);
+            }
+        });
+    }
+
+    updateStylesFor(variableName) {
+        const styleElements = document.querySelectorAll(`[res-style*="${variableName}"]`);
+        styleElements.forEach(styleElement => {
+            const styleCondition = styleElement.getAttribute('res-style');
+            try {
+                const styleClass = eval(styleCondition);
+                if (styleClass) {
+                    styleElement.classList.add(styleClass);
+                } else {
+                    styleElement.classList.remove(styleClass);
+                }
+            } catch (e) {
+                console.error(`Error evaluating style for ${variableName}: ${styleCondition}`, e);
             }
         });
     }
@@ -200,18 +231,26 @@ class Resonant {
                             subEl.innerHTML = instance[key];
                         }
                         subEl.setAttribute('data-resonant-bound', 'true');
+                    } else {
+                        if (subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') {
+                            if (subEl.type === 'checkbox') {
+                                subEl.checked = instance[key];
+                            } else {
+                                subEl.value = instance[key];
+                            }
+                        } else {
+                            subEl.innerHTML = instance[key];
+                        }
                     }
                 }
             }
 
-            // Handle res-onclick
             const onclickElements = clonedEl.querySelectorAll('[res-onclick], [res-onclick-remove]');
             onclickElements.forEach(onclickEl => {
                 const functionName = onclickEl.getAttribute('res-onclick');
                 const removeKey = onclickEl.getAttribute('res-onclick-remove');
 
                 if (functionName) {
-                    // Remove any existing event listeners to prevent duplicates
                     onclickEl.onclick = null;
 
                     onclickEl.onclick = () => {

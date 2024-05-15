@@ -4,6 +4,11 @@
     <title>Resonant.js Task Manager Demo</title>
     <script src="../resonant.js"></script>
 </head>
+<style>
+    .done {
+        text-decoration: line-through;
+    }
+</style>
 <body>
 <h1>Resonant.js Task Manager Demo</h1>
 
@@ -11,6 +16,9 @@
 <div>
     <h2>Add New Task</h2>
     <input type="text" placeholder="Task Name" res="taskName" />
+    <p>
+        Name: <span res="taskName"></span>
+    </p>
     <button onclick="addTask()">Add Task</button>
 </div>
 
@@ -21,7 +29,7 @@
         <li>
             <input type="checkbox" res-prop="done" />
             <span res-prop="name"></span>
-            <button res-onclick="remove">Remove</button>
+            <button res-onclick-remove="name">Remove</button>
         </li>
     </ul>
 </div>
@@ -47,7 +55,7 @@
         const index = tasks.indexOf(task);
         tasks.splice(index, 1);
 
-        //You could use res-onclick-remove="name" as well, still trying to figure out if I want to leave this or not
+        //You could use  as well, still trying to figure out if I want to leave this or not
     }
 
     // Add a function to add a new task
