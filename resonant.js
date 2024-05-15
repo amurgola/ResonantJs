@@ -107,10 +107,12 @@ class Resonant {
         const elements = document.querySelectorAll(`[res="${variableName}"]`);
         const value = this.data[variableName];
 
+
+
         elements.forEach(element => {
             if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+                element.value = value;
                 if (!element.hasAttribute('data-resonant-bound')) {
-                    element.value = value;
                     element.oninput = () => {
                         this.data[variableName] = element.value;
                         this._queueUpdate(variableName, 'modified', this.data[variableName]);
