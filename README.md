@@ -60,9 +60,10 @@ Include resonant.js in your HTML file, and use the following example to understa
 - **`res` and `res-prop` Attributes**: Bind HTML elements to your data model seamlessly.
     - `res` is used to identify an overarching data model.
     - `res-prop` links individual properties within that model to corresponding UI elements.
-- **`res-conditional` Attribute**: Conditionally display elements based on the data model's properties.
+- **`res-display` Attribute**: Conditionally display elements based on the data model's properties.
 - **`res-onclick` Attribute**: Triggers a function when an element is clicked, allowing for custom event handling.
 - **`res-onclick-remove` Attribute**: Removes an item from an array when the associated element is clicked.
+- **`res-style` Attribute**: Dynamically update CSS styles based on data model properties.
 - **Automatic UI Updates**: Changes to your JavaScript objects instantly reflect in the associated UI components, reducing manual DOM manipulation.
 
 ### Advanced Features

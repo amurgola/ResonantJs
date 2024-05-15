@@ -29,10 +29,10 @@
     <section class="grid">
         <div>
             <h2>Counter: <span res="counter"></span></h2>
-            <div res-conditional="counter < 10" class="conditional">
+            <div res-display="counter < 10" class="conditional">
                 Only shows when counter is less than 10
             </div>
-            <div res-conditional="counter >= 10" class="conditional">
+            <div res-display="counter >= 10" class="conditional">
                 Only shows when counter is greater than or equal to 10
             </div>
         </div>
@@ -44,7 +44,7 @@
     <section class="grid" res="user">
         <div>
             <h2>User Information</h2>
-            <div res-conditional="user.firstname == 'John' && user.lastname == 'Doe'" class="conditional">
+            <div res-display="user.firstname == 'John' && user.lastname == 'Doe'" class="conditional">
                 Only shows when firstname is John and lastname is Doe
             </div>
 

@@ -127,7 +127,7 @@ class Resonant {
                     this.data[variableName] = newValue;
                 }
                 this.updateElement(variableName);
-                this.updateConditionalsFor(variableName);
+                this.updateDisplayConditionalsFor(variableName);
                 this.updateStylesFor(variableName);
                 if (!Array.isArray(newValue) && typeof newValue !== 'object') {
                     this._queueUpdate(variableName, 'modified', this.data[variableName]);
@@ -151,7 +151,7 @@ class Resonant {
                     this._triggerCallbacks(variableName, update);
                 });
                 this.updateElement(variableName);
-                this.updateConditionalsFor(variableName);
+                this.updateDisplayConditionalsFor(variableName);
                 this.updateStylesFor(variableName);
             }, 0);
         }
@@ -223,14 +223,14 @@ class Resonant {
             }
         });
 
-        this.updateConditionalsFor(variableName);
+        this.updateDisplayConditionalsFor(variableName);
         this.updateStylesFor(variableName);
     }
 
-    updateConditionalsFor(variableName) {
-        const conditionalElements = document.querySelectorAll(`[res-conditional*="${variableName}"]`);
+    updateDisplayConditionalsFor(variableName) {
+        const conditionalElements = document.querySelectorAll(`[res-display*="${variableName}"]`);
         conditionalElements.forEach(conditionalElement => {
-            const condition = conditionalElement.getAttribute('res-conditional');
+            const condition = conditionalElement.getAttribute('res-display');
             try {
                 if (eval(condition)) {
                     conditionalElement.style.display = '';
