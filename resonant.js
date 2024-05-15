@@ -69,6 +69,7 @@ class Resonant {
     }
 
     _queueUpdate(variableName, action, item, property, oldValue) {
+
         if (!this.pendingUpdates.has(variableName)) {
             this.pendingUpdates.add(variableName);
             setTimeout(() => {
@@ -181,14 +182,40 @@ class Resonant {
 
     updateStylesFor(variableName) {
         const styleElements = document.querySelectorAll(`[res-style*="${variableName}"]`);
+
         styleElements.forEach(styleElement => {
-            const styleCondition = styleElement.getAttribute('res-style');
+            let styleCondition = styleElement.getAttribute('res-style');
             try {
-                const styleClass = eval(styleCondition);
-                if (styleClass) {
-                    styleElement.classList.add(styleClass);
+                let parent = styleElement;
+                let index = null;
+                while (parent && !index) {
+                    index = parent.getAttribute('res-index');
+                    parent = parent.parentElement;
+                }
+
+                if (index !== null) {
+                    const item = this.data[variableName][index];
+                    styleCondition = styleCondition.replace(new RegExp(`\\b${variableName}\\b`, 'g'), 'item');
+                    const styleClass = new Function('item', `return ${styleCondition}`)(item);
+
+                    if (styleClass) {
+                        styleElement.classList.add(styleClass);
+                    } else {
+                        var elementHasStyle = styleElement.classList.contains(styleClass);
+                        if (elementHasStyle) {
+                            styleElement.classList.remove(styleClass);
+                        }
+                    }
                 } else {
-                    styleElement.classList.remove(styleClass);
+                    const styleClass = eval(styleCondition);
+                    if (styleClass) {
+                        styleElement.classList.add(styleClass);
+                    } else {
+                        var elementHasStyle = styleElement.classList.contains(styleClass);
+                        if (elementHasStyle) {
+                            styleElement.classList.remove(styleClass);
+                        }
+                    }
                 }
             } catch (e) {
                 console.error(`Error evaluating style for ${variableName}: ${styleCondition}`, e);

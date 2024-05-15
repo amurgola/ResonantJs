@@ -16,9 +16,6 @@
 <div>
     <h2>Add New Task</h2>
     <input type="text" placeholder="Task Name" res="taskName" />
-    <p>
-        Name: <span res="taskName"></span>
-    </p>
     <button onclick="addTask()">Add Task</button>
 </div>
 
@@ -26,10 +23,10 @@
 <div>
     <h2>Task List</h2>
     <ul res="tasks">
-        <li>
+        <li res-style="tasks.done ? 'done' : ''">
             <input type="checkbox" res-prop="done" />
             <span res-prop="name"></span>
-            <button res-onclick-remove="name">Remove</button>
+            <button res-onclick="remove">Remove</button>
         </li>
     </ul>
 </div>
