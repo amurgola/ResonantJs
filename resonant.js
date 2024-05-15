@@ -1,12 +1,94 @@
+class ObservableArray extends Array {
+    constructor(variableName, resonantInstance, ...args) {
+        super(...args);
+        this.variableName = variableName;
+        this.resonantInstance = resonantInstance;
+        this.isDeleting = false;
+    }
+
+    push(...args) {
+        const result = super.push(...args);
+        this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
+        args.forEach((item, index) => {
+            this.resonantInstance._queueUpdate(this.variableName, 'added', item, this.length - 1 - index);
+        });
+        return result;
+    }
+
+    splice(start, deleteCount, ...items) {
+        const removedItems = super.splice(start, deleteCount, ...items);
+        this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
+
+        if (deleteCount > 0) {
+            removedItems.forEach((item, index) => {
+                this.resonantInstance._queueUpdate(this.variableName, 'removed', item, start + index);
+            });
+        }
+
+        if (items.length > 0) {
+            items.forEach((item, index) => {
+                this.resonantInstance._queueUpdate(this.variableName, 'added', item, start + index);
+            });
+        }
+
+        return removedItems;
+    }
+
+    set(index, value) {
+        if (this[index] !== value) {
+            if (this.isDeleting) {
+                return true;
+            }
+
+            const originalBeforeChange = this.resonantInstance.arrayDataChangeDetection[this.variableName];
+            let action = 'modified';
+
+            if (index >= originalBeforeChange.length) {
+                action = 'added';
+            } else if (originalBeforeChange[index] === undefined) {
+                action = 'added';
+            }
+
+            this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
+
+            const oldValue = this[index];
+            this[index] = value;
+            this.resonantInstance._queueUpdate(this.variableName, action, this[index], index, oldValue);
+        }
+        return true;
+    }
+
+    delete(index) {
+        const oldValue = this[index];
+        this.isDeleting = true;
+        this.splice(index, 1);
+
+        this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
+
+        this.resonantInstance._queueUpdate(this.variableName, 'removed', null, index, oldValue);
+        this.isDeleting = false;
+        return true;
+    }
+}
+
 class Resonant {
     constructor() {
         this.data = {};
         this.callbacks = {};
-        this.pendingUpdates = new Set();
+        this.pendingUpdates = new Map();
+        this.arrayDataChangeDetection = {}; // Added to keep track of array state
     }
 
     add(variableName, value) {
-        this._assignValueToData(variableName, value);
+        if (Array.isArray(value)) {
+            this.data[variableName] = new ObservableArray(variableName, this, ...value);
+            this.arrayDataChangeDetection[variableName] = this.data[variableName].slice();
+        } else if (typeof value === 'object') {
+            this.data[variableName] = this._createObject(variableName, value);
+        } else {
+            this.data[variableName] = value;
+        }
+
         this._defineProperty(variableName);
         this.updateElement(variableName);
     }
@@ -15,16 +97,6 @@ class Resonant {
         Object.entries(config).forEach(([variableName, value]) => {
             this.add(variableName, value);
         });
-    }
-
-    _assignValueToData(variableName, value) {
-        if (Array.isArray(value)) {
-            this.data[variableName] = this._createArray(variableName, value);
-        } else if (typeof value === 'object') {
-            this.data[variableName] = this._createObject(variableName, value);
-        } else {
-            this.data[variableName] = value;
-        }
     }
 
     _createObject(variableName, obj) {
@@ -41,58 +113,19 @@ class Resonant {
         });
     }
 
-    _createArray(variableName, arr) {
-        const self = this;
-        return new Proxy(arr, {
-            get(target, index) {
-                if (typeof target[index] === 'object' && !target[index][Symbol('isProxy')]) {
-                    target[index] = self._createObject(`${variableName}[${index}]`, target[index]);
-                }
-                return target[index];
-            },
-            set(target, index, value) {
-                if (target[index] !== value) {
-                    const action = target.hasOwnProperty(index) ? 'modified' : 'added';
-                    const oldValue = target[index];
-                    target[index] = value;
-                    self._queueUpdate(variableName, action, target[index], index, oldValue);
-                }
-                return true;
-            },
-            deleteProperty(target, index) {
-                const oldValue = target[index];
-                target.splice(index, 1);
-                self._queueUpdate(variableName, 'removed', oldValue, index);
-                return true;
-            }
-        });
-    }
-
-    _queueUpdate(variableName, action, item, property, oldValue) {
-
-        if (!this.pendingUpdates.has(variableName)) {
-            this.pendingUpdates.add(variableName);
-            setTimeout(() => {
-                this.pendingUpdates.delete(variableName);
-                this._triggerCallbacks(variableName, action, item, property, oldValue);
-                this.updateElement(variableName);
-                this.updateConditionalsFor(variableName);
-                this.updateStylesFor(variableName);
-            }, 0);
-        }
-    }
-
-    _triggerCallbacks(variableName, action, item, property, oldValue) {
-        if (this.callbacks[variableName]) {
-            this.callbacks[variableName].forEach(callback => callback(this.data[variableName], item, action, property, oldValue));
-        }
-    }
-
     _defineProperty(variableName) {
         Object.defineProperty(window, variableName, {
             get: () => this.data[variableName],
             set: (newValue) => {
-                this._assignValueToData(variableName, newValue);
+                if (Array.isArray(newValue)) {
+                    this.data[variableName] = new ObservableArray(variableName, this, ...newValue);
+                    this.arrayDataChangeDetection[variableName] = this.data[variableName].slice(); // Create a copy for change detection
+
+                } else if (typeof newValue === 'object') {
+                    this.data[variableName] = this._createObject(variableName, newValue);
+                } else {
+                    this.data[variableName] = newValue;
+                }
                 this.updateElement(variableName);
                 this.updateConditionalsFor(variableName);
                 this.updateStylesFor(variableName);
@@ -103,15 +136,43 @@ class Resonant {
         });
     }
 
+    _queueUpdate(variableName, action, item, property, oldValue) {
+        if (!this.pendingUpdates.has(variableName)) {
+            this.pendingUpdates.set(variableName, []);
+        }
+
+        this.pendingUpdates.get(variableName).push({ action, item, property, oldValue });
+
+        if (this.pendingUpdates.get(variableName).length === 1) {
+            setTimeout(() => {
+                const updates = this.pendingUpdates.get(variableName);
+                this.pendingUpdates.delete(variableName);
+                updates.forEach(update => {
+                    this._triggerCallbacks(variableName, update);
+                });
+                this.updateElement(variableName);
+                this.updateConditionalsFor(variableName);
+                this.updateStylesFor(variableName);
+            }, 0);
+        }
+    }
+
+    _triggerCallbacks(variableName, callbackData) {
+        if (this.callbacks[variableName]) {
+            this.callbacks[variableName].forEach(callback => {
+                const item = callbackData.item || callbackData.oldValue;
+                callback(this.data[variableName], item, callbackData.action);
+            });
+        }
+    }
+
     updateElement(variableName) {
         const elements = document.querySelectorAll(`[res="${variableName}"]`);
         const value = this.data[variableName];
 
-
-
         elements.forEach(element => {
+            element.value = value;
             if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
-                element.value = value;
                 if (!element.hasAttribute('data-resonant-bound')) {
                     element.oninput = () => {
                         this.data[variableName] = element.value;
@@ -280,8 +341,6 @@ class Resonant {
                 const removeKey = onclickEl.getAttribute('res-onclick-remove');
 
                 if (functionName) {
-                    onclickEl.onclick = null;
-
                     onclickEl.onclick = () => {
                         const func = new Function('item', `return ${functionName}(item)`);
                         func(instance);
@@ -289,8 +348,6 @@ class Resonant {
                 }
 
                 if (removeKey) {
-                    onclickEl.onclick = null;
-
                     onclickEl.onclick = () => {
                         const index = this.data[variableName].findIndex(t => t[removeKey] === instance[removeKey]);
                         if (index !== -1) {
