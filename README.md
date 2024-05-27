@@ -47,7 +47,10 @@ Include resonant.js in your HTML file, and use the following example to understa
 
 <script>
   const resonantJs = new Resonant();
-  resonantJs.add("counter", 0);
+  resonantJs.add("counter", 0, true);
+  //counter will instantiate the variable with name "counter"
+  //0 is the initial value of the variable
+  //true is optional, if true the variable will be stored in local storage
 </script>
 </body>
 </html>
