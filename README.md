@@ -9,7 +9,6 @@ Resonant.js is an open-source lightweight JavaScript framework that enables reac
 - **Bidirectional Input Binding**: Bind HTML input fields directly to your data model.
 - **Efficient Conditional Updates**: Only evaluate conditional expressions tied to specific variable changes.
 - **Lightweight and Easy to Integrate**: Minimal setup required to get started.
-- **Compatible with Modern Browsers**: Works seamlessly across all modern web browsers.
 ## Installation
 ## NPM
 To install via NPM, use the following command:
@@ -70,20 +69,7 @@ Include resonant.js in your HTML file, and use the following example to understa
 - **Dynamic Arrays and Objects**: Easily handle collections and nested objects to dynamically add or remove elements based on your data structures.
 - **Event Callbacks**: Register custom functions to execute whenever your data model changes.
 - **Bidirectional Input Binding**: Bind form input fields directly to your data, making two-way synchronization simple.
-
-### New Features in Version 1.0.2
-
-#### Pending Updates Mechanism
-- Introduced to prevent redundant updates and ensure callbacks are only triggered once per update cycle, improving performance and user experience.
-
-#### Callback Parameter Enhancement
-- Callbacks now receive detailed parameters including the specific action taken (`added`, `modified`, `removed`), the item affected, and the previous value. This provides better context for handling updates.
-
-#### Batched Updates for Object Properties
-- Improved handling of object property updates to ensure changes are batched together, preventing multiple redundant callback triggers.
-
-#### Refined Data Binding
-- Enhanced data binding between model and view to ensure consistent synchronization without unnecessary updates.
+- **Optional Persistent Data**: Save your data model to local storage for easy retrieval and persistence across sessions.
 
 ## Other Information
 - The demo HTML file uses the Pico CSS framework for styling. You can find more information about Pico CSS [here](https://picocss.com/).

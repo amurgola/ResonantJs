@@ -1,5 +1,8 @@
 class ObservableArray extends Array {
     constructor(variableName, resonantInstance, ...args) {
+        if(resonantInstance === undefined) {
+            return super(...args);
+        }
         super(...args);
         this.variableName = variableName;
         this.resonantInstance = resonantInstance;
@@ -69,6 +72,17 @@ class ObservableArray extends Array {
         this.isDeleting = false;
         return true;
     }
+
+    filter(filter) {
+        if(this.resonantInstance === undefined) {
+            return super.filter(filter);
+        }
+
+        const result = super.filter(filter);
+        this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
+        this.resonantInstance._queueUpdate(this.variableName, 'filtered');
+        return result;
+    }
 }
 
 class Resonant {
@@ -76,10 +90,11 @@ class Resonant {
         this.data = {};
         this.callbacks = {};
         this.pendingUpdates = new Map();
-        this.arrayDataChangeDetection = {}; // Added to keep track of array state
+        this.arrayDataChangeDetection = {};
     }
 
-    add(variableName, value) {
+    add(variableName, value, persist) {
+        value = this.persist(variableName, value, persist);
         if (Array.isArray(value)) {
             this.data[variableName] = new ObservableArray(variableName, this, ...value);
             this.arrayDataChangeDetection[variableName] = this.data[variableName].slice();
@@ -91,6 +106,25 @@ class Resonant {
 
         this._defineProperty(variableName);
         this.updateElement(variableName);
+    }
+
+    persist(variableName, value, persist) {
+        if (persist === undefined || !persist) {
+            return value;
+        }
+        var found = localStorage.getItem('res_' + variableName);
+        if (found !== null && found !== undefined){
+            return JSON.parse(localStorage.getItem('res_' + variableName));
+        } else {
+            localStorage.setItem('res_' + variableName, JSON.stringify(value));
+            return value;
+        }
+    }
+
+    updatePersistentData(variableName) {
+        if (localStorage.getItem('res_' + variableName)) {
+            localStorage.setItem('res_' + variableName, JSON.stringify(this.data[variableName]));
+        }
     }
 
     addAll(config) {
@@ -146,6 +180,7 @@ class Resonant {
         if (this.pendingUpdates.get(variableName).length === 1) {
             setTimeout(() => {
                 const updates = this.pendingUpdates.get(variableName);
+                this.updatePersistentData(variableName);
                 this.pendingUpdates.delete(variableName);
                 updates.forEach(update => {
                     this._triggerCallbacks(variableName, update);
@@ -256,6 +291,14 @@ class Resonant {
                     parent = parent.parentElement;
                 }
 
+                let resStyles = styleElement.getAttribute('res-styles');
+                if (resStyles) {
+                    let resStylesArray = resStyles.split(' ');
+                    resStylesArray.forEach(resStyle => {
+                        styleElement.classList.remove(resStyle);
+                    });
+                }
+
                 if (index !== null) {
                     const item = this.data[variableName][index];
                     styleCondition = styleCondition.replace(new RegExp(`\\b${variableName}\\b`, 'g'), 'item');
@@ -271,8 +314,10 @@ class Resonant {
                     }
                 } else {
                     const styleClass = eval(styleCondition);
+
                     if (styleClass) {
                         styleElement.classList.add(styleClass);
+                        styleElement.setAttribute('res-styles', styleClass);
                     } else {
                         var elementHasStyle = styleElement.classList.contains(styleClass);
                         if (elementHasStyle) {
@@ -339,7 +384,6 @@ class Resonant {
             onclickElements.forEach(onclickEl => {
                 const functionName = onclickEl.getAttribute('res-onclick');
                 const removeKey = onclickEl.getAttribute('res-onclick-remove');
-
                 if (functionName) {
                     onclickEl.onclick = () => {
                         const func = new Function('item', `return ${functionName}(item)`);
