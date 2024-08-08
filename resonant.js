@@ -9,6 +9,17 @@ class ObservableArray extends Array {
         this.isDeleting = false;
     }
 
+    //temp fix for issues
+    forceUpdate() {
+        this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
+        this.resonantInstance._queueUpdate(this.variableName, 'modified', this.slice());
+    }
+
+    update(array) {
+        window[this.variableName] = array;
+        this.resonantInstance._queueUpdate(this.variableName, 'updated', array);
+    }
+
     push(...args) {
         const result = super.push(...args);
         this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
@@ -73,8 +84,8 @@ class ObservableArray extends Array {
         return true;
     }
 
-    filter(filter) {
-        if(this.resonantInstance === undefined) {
+    filter(filter, actuallyFilter = true) {
+        if(this.resonantInstance === undefined || actuallyFilter === false) {
             return super.filter(filter);
         }
 
@@ -121,7 +132,7 @@ class Resonant {
         }
     }
 
-    updatePersistentData(variableName) {
+    updatePersistantData(variableName) {
         if (localStorage.getItem('res_' + variableName)) {
             localStorage.setItem('res_' + variableName, JSON.stringify(this.data[variableName]));
         }
@@ -180,7 +191,7 @@ class Resonant {
         if (this.pendingUpdates.get(variableName).length === 1) {
             setTimeout(() => {
                 const updates = this.pendingUpdates.get(variableName);
-                this.updatePersistentData(variableName);
+                this.updatePersistantData(variableName);
                 this.pendingUpdates.delete(variableName);
                 updates.forEach(update => {
                     this._triggerCallbacks(variableName, update);
@@ -190,6 +201,7 @@ class Resonant {
                 this.updateStylesFor(variableName);
             }, 0);
         }
+
     }
 
     _triggerCallbacks(variableName, callbackData) {

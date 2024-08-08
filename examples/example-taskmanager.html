@@ -45,15 +45,12 @@
 
     // Add a callback to log actions taken on tasks
     resonantJs.addCallback("tasks", (tasks, task, action) => {
-        console.log(`Action taken: ${action} for ${task.name}`);
+        console.log(`Action taken: ${action}`);
     });
 
     function remove(task) {
-        //get by name
-        const index = tasks.findIndex(t => t.name === task.name);
-        tasks.splice(index, 1);
-
-        //You could use  as well, still trying to figure out if I want to leave this or not
+        const index = tasks.indexOf(task);
+        tasks.delete(index);
     }
 
     // Add a function to add a new task
