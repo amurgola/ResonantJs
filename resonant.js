@@ -4,6 +4,9 @@ class ObservableArray extends Array {
             return super(...args);
         }
         super(...args);
+
+        var isCreating = resonantInstance.data[variableName] === undefined;
+
         this.variableName = variableName;
         this.resonantInstance = resonantInstance;
         this.isDeleting = false;
@@ -13,6 +16,10 @@ class ObservableArray extends Array {
                 this[index] = this._createProxy(item, index);
             }
         });
+
+        if(!isCreating) {
+            this.forceUpdate();
+        }
     }
 
     _createProxy(item, index) {
@@ -221,9 +228,11 @@ class Resonant {
 
         if (this.pendingUpdates.get(variableName).length === 1) {
             setTimeout(() => {
-                const updates = this.pendingUpdates.get(variableName);
+                let updates = this.pendingUpdates.get(variableName);
                 this.updatePersistantData(variableName);
                 this.pendingUpdates.delete(variableName);
+
+                updates = updates.filter((v, i, a) => a.findIndex(t => (t.property === v.property && t.action === v.action)) === i);
                 updates.forEach(update => {
                     this._triggerCallbacks(variableName, update);
                 });

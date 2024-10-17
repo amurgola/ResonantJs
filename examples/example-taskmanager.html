@@ -3,6 +3,10 @@
 <head>
     <title>Resonant.js Task Manager Demo</title>
     <script src="../resonant.js"></script>
+    <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css"
+    />
 </head>
 <style>
     .done {
@@ -10,26 +14,29 @@
     }
 </style>
 <body>
-<h1>Resonant.js Task Manager Demo</h1>
+<main class="container">
+    <h1>Resonant.js Task Manager Demo</h1>
 
-<!-- Task Input -->
-<div>
-    <h2>Add New Task</h2>
-    <input type="text" placeholder="Task Name" res="taskName" />
-    <button onclick="addTask()">Add Task</button>
-</div>
+    <!-- Task Input -->
+    <div>
+        <h2>Add New Task</h2>
+        <input type="text" placeholder="Task Name" res="taskName" />
+        <button onclick="addTask()">Add Task</button>
+    </div>
 
-<!-- Task List -->
-<div>
-    <h2>Task List</h2>
-    <ul res="tasks">
-        <li res-style="tasks.done ? 'done' : ''">
-            <input type="checkbox" res-prop="done" />
-            <span res-prop="name"></span>
-            <button res-onclick="remove">Remove</button>
-        </li>
-    </ul>
-</div>
+    <!-- Task List -->
+    <div>
+        <h2>Task List</h2>
+        <ul res="tasks">
+            <li res-style="tasks.done ? 'done' : ''">
+                <input type="checkbox" res-prop="done" />
+                <span res-prop="name"></span>
+                <button res-onclick="remove">Remove</button>
+            </li>
+        </ul>
+    </div>
+</main>
+
 
 <script>
     const resonantJs = new Resonant();
