@@ -7,6 +7,25 @@ class ObservableArray extends Array {
         this.variableName = variableName;
         this.resonantInstance = resonantInstance;
         this.isDeleting = false;
+
+        this.forEach((item, index) => {
+            if (typeof item === 'object') {
+                this[index] = this._createProxy(item, index);
+            }
+        });
+    }
+
+    _createProxy(item, index) {
+        return new Proxy(item, {
+            set: (target, property, value) => {
+                if (target[property] !== value) {
+                    const oldValue = target[property];
+                    target[property] = value;
+                    this.resonantInstance._queueUpdate(this.variableName, 'modified', target, property, oldValue, index);
+                }
+                return true;
+            }
+        });
     }
 
     //temp fix for issues
@@ -21,6 +40,12 @@ class ObservableArray extends Array {
     }
 
     push(...args) {
+        args = args.map((item, index) => {
+            if (typeof item === 'object') {
+                return this._createProxy(item, this.length + index);
+            }
+            return item;
+        });
         const result = super.push(...args);
         this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
         args.forEach((item, index) => {
@@ -30,6 +55,12 @@ class ObservableArray extends Array {
     }
 
     splice(start, deleteCount, ...items) {
+        items = items.map((item, index) => {
+            if (typeof item === 'object') {
+                return this._createProxy(item, start + index);
+            }
+            return item;
+        });
         const removedItems = super.splice(start, deleteCount, ...items);
         this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
 
