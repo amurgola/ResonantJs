@@ -108,8 +108,11 @@
                 </li>
             </ul>
         </div>
+        <div>
+            <button onclick="addProjectMember()">Add</button>
+            <button onclick="toggleProjectMemberName()">Toggle Alice's Name</button>
+        </div>
 
-        <button onclick="addProjectMember()">Add Project Member</button>
     </section>
 
     <section class="grid">
@@ -134,6 +137,55 @@
             &lt;/ul&gt;<br/><br/>
             &lt;button onclick="addProjectMember()"&gt;Add Project Member&lt;/button&gt;
         </code>
+    </section>
+    <section>
+        <h1>Summary</h1>
+        <p>
+            Resonant.js is a simple library that allows you to bind JavaScript variables to HTML elements.
+            This allows you to create dynamic web applications without the need for complex frameworks.
+        </p>
+        <h2>HTML properties</h2>
+        <table>
+            <tr>
+                <td>res</td>
+                <td>Bind an object to a section of HTML</td>
+            </tr>
+            <tr>
+                <td>res-prop</td>
+                <td>Bind an object property to an HTML element, used when the defined variable is an object array</td>
+            </tr>
+            <tr>
+                <td>res-display</td>
+                <td>Conditionally display an element based on a JavaScript expression</td>
+            </tr>
+            <tr>
+                <td>res-style, res-styles</td>
+                <td>Bind a style or styles object to an HTML element conditionally</td>
+            </tr>
+            <tr>
+                <td>res-onclick, res-onclick-remove</td>
+                <td>Bind an onclick event to an HTML element</td>
+            </tr>
+        </table>
+        <h2>Javascript Functions</h2>
+        <table>
+            <tr>
+                <td>const resonantJs = new Resonant();</td>
+                <td>Initialize the Resonant object</td>
+            </tr>
+            <tr>
+                <td>resonantJs.add("variableName", optionalBooleanForPersistence)</td>
+                <td>Bind a variable to the Resonant object</td>
+            </tr>
+            <tr>
+                <td>resonantJs.addAll()</td>
+                <td>Bind multiple variables to the Resonant object at once</td>
+            </tr>
+            <tr>
+                <td>resonantJs.addCallback("variableName", (objectReturned) => {})</td>
+                <td>Bind a callback function to a variable</td>
+            </tr>
+        </table>
     </section>
 </main>
 
@@ -169,6 +221,12 @@
     function addProjectMember() {
         const newMember = { name: "Charlie", role: "Product Manager" };
         projectTeam.push(newMember);
+    }
+
+    //Silly function to demonstrate dynamic list rerendering
+    function toggleProjectMemberName() {
+        const alice = projectTeam[0];
+        alice.name = alice.name === "Alice" ? "Alicia" : "Alice";
     }
 </script>
 </body>
