@@ -241,7 +241,6 @@ class Resonant {
                 this.updateStylesFor(variableName);
             }, 0);
         }
-
     }
 
     _triggerCallbacks(variableName, callbackData) {
@@ -258,60 +257,73 @@ class Resonant {
         const value = this.data[variableName];
 
         elements.forEach(element => {
-            element.value = value;
-            if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
-                if (!element.hasAttribute('data-resonant-bound')) {
-                    element.oninput = () => {
-                        this.data[variableName] = element.value;
-                        this._queueUpdate(variableName, 'modified', this.data[variableName]);
-                    };
-                    element.setAttribute('data-resonant-bound', 'true');
-                }
-            } else if (Array.isArray(value)) {
+            if (Array.isArray(value)) {
                 element.querySelectorAll(`[res="${variableName}"][res-rendered=true]`).forEach(el => el.remove());
                 this._renderArray(variableName, element);
-            } else if (typeof value === 'object') {
+            }
+            else if (typeof value === 'object') {
                 const subElements = element.querySelectorAll(`[res-prop]`);
                 subElements.forEach(subEl => {
                     const key = subEl.getAttribute('res-prop');
                     if (key && key in value) {
-                        if (!subEl.hasAttribute('data-resonant-bound')) {
-                            if (subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') {
-                                if (subEl.type === 'checkbox') {
-                                    subEl.checked = value[key];
-                                    subEl.onchange = () => {
-                                        this.data[variableName][key] = subEl.checked;
-                                    };
-                                } else {
-                                    subEl.value = value[key];
-                                    subEl.oninput = () => {
-                                        this.data[variableName][key] = subEl.value;
-                                    };
-                                }
-                            } else {
-                                subEl.innerHTML = value[key];
-                            }
-                            subEl.setAttribute('data-resonant-bound', 'true');
-                        } else {
-                            if (subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') {
-                                if (subEl.type === 'checkbox') {
-                                    subEl.checked = value[key];
-                                } else {
-                                    subEl.value = value[key];
-                                }
-                            } else {
-                                subEl.innerHTML = value[key];
-                            }
-                        }
+                        this.renderElement(subEl, value, key, variableName);
                     }
                 });
             } else {
-                element.innerHTML = value;
+                this.renderElement(element, value, "", variableName);
             }
         });
 
         this.updateDisplayConditionalsFor(variableName);
         this.updateStylesFor(variableName);
+    }
+
+    renderElement(element, value, key, variableName, overrideElementValue, isFromArray = false) {
+        let elementValue = value;
+
+        if (key) {
+            elementValue = value[key];
+        }
+
+        if (overrideElementValue) {
+            elementValue = overrideElementValue;
+        }
+
+        let updateReference = (newValue) => {
+            if (isFromArray) {
+                if (key) {
+                    value[key] = newValue;
+                } else {
+                    value = newValue;
+                }
+            } else {
+                if (key && variableName) {
+                    this.data[variableName][key] = newValue;
+                } else if (variableName) {
+                    this.data[variableName] = newValue;
+                } else {
+                    this.data[key] = newValue;
+                }
+            }
+        };
+
+        if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+            if (element.type === 'checkbox') {
+                element.checked = elementValue;
+                element.onchange = () => {
+                    updateReference(element.checked);
+                };
+            } else {
+                element.value = elementValue;
+                element.oninput = () => {
+                    updateReference(element.value);
+                };
+            }
+        } else if (element.tagName === 'IMG') {
+            element.src = elementValue;
+        } else {
+            element.innerHTML = elementValue;
+        }
     }
 
     updateDisplayConditionalsFor(variableName) {
@@ -404,36 +416,7 @@ class Resonant {
                     overrideInstanceValue = instance;
                 }
                 if (subEl) {
-                    if (!subEl.hasAttribute('data-resonant-bound')) {
-                        if (subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') {
-                            if (subEl.type === 'checkbox') {
-                                subEl.checked = overrideInstanceValue ?? instance[key] ;
-                                subEl.onchange = () => {
-                                    instance[key] = subEl.checked;
-                                    this._queueUpdate(variableName, 'modified', instance, key, overrideInstanceValue ?? instance[key]);
-                                };
-                            } else {
-                                subEl.value = overrideInstanceValue ?? instance[key];
-                                subEl.oninput = () => {
-                                    instance[key] = subEl.value;
-                                    this._queueUpdate(variableName, 'modified', instance, key, overrideInstanceValue ?? instance[key]);
-                                };
-                            }
-                        } else {
-                            subEl.innerHTML = overrideInstanceValue ?? instance[key];
-                        }
-                        subEl.setAttribute('data-resonant-bound', 'true');
-                    } else {
-                        if (subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') {
-                            if (subEl.type === 'checkbox') {
-                                subEl.checked = overrideInstanceValue ?? instance[key];
-                            } else {
-                                subEl.value = overrideInstanceValue ?? instance[key];
-                            }
-                        } else {
-                            subEl.innerHTML = overrideInstanceValue ?? instance[key];
-                        }
-                    }
+                    this.renderElement(subEl, instance, key, variableName, overrideInstanceValue, true);
                 }
             }
 
