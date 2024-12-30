@@ -1,6 +1,6 @@
 {
   "name": "resonantjs",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "A lightweight JavaScript framework that enables reactive data-binding for building dynamic and responsive web applications. It simplifies creating interactive UIs by automatically updating the DOM when your data changes.",
   "main": "resonant.js",
   "repository": {

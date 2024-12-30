@@ -1,6 +1,6 @@
 class ObservableArray extends Array {
     constructor(variableName, resonantInstance, ...args) {
-        if(resonantInstance === undefined) {
+        if (resonantInstance === undefined) {
             return super(...args);
         }
         super(...args);
@@ -35,7 +35,6 @@ class ObservableArray extends Array {
         });
     }
 
-    //temp fix for issues
     forceUpdate() {
         this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
         this.resonantInstance._queueUpdate(this.variableName, 'modified', this.slice());
@@ -102,9 +101,9 @@ class ObservableArray extends Array {
             }
 
             this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
-
             const oldValue = this[index];
             this[index] = value;
+
             this.resonantInstance._queueUpdate(this.variableName, action, this[index], index, oldValue);
         }
         return true;
@@ -114,9 +113,7 @@ class ObservableArray extends Array {
         const oldValue = this[index];
         this.isDeleting = true;
         this.splice(index, 1);
-
         this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
-
         this.resonantInstance._queueUpdate(this.variableName, 'removed', null, index, oldValue);
         this.isDeleting = false;
         return true;
@@ -126,7 +123,6 @@ class ObservableArray extends Array {
         if(this.resonantInstance === undefined || actuallyFilter === false) {
             return super.filter(filter);
         }
-
         const result = super.filter(filter);
         this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
         this.resonantInstance._queueUpdate(this.variableName, 'filtered');
@@ -142,12 +138,28 @@ class Resonant {
         this.arrayDataChangeDetection = {};
     }
 
+    _handleInputElement(element, value, onChangeCallback) {
+        if (element.type === 'checkbox') {
+            element.checked = value;
+            if (!element.hasAttribute('data-resonant-bound')) {
+                element.onchange = () => onChangeCallback(element.checked);
+                element.setAttribute('data-resonant-bound', 'true');
+            }
+        } else {
+            element.value = value;
+            if (!element.hasAttribute('data-resonant-bound')) {
+                element.oninput = () => onChangeCallback(element.value);
+                element.setAttribute('data-resonant-bound', 'true');
+            }
+        }
+    }
+
     add(variableName, value, persist) {
         value = this.persist(variableName, value, persist);
         if (Array.isArray(value)) {
             this.data[variableName] = new ObservableArray(variableName, this, ...value);
             this.arrayDataChangeDetection[variableName] = this.data[variableName].slice();
-        } else if (typeof value === 'object') {
+        } else if (typeof value === 'object' && value !== null) {
             this.data[variableName] = this._createObject(variableName, value);
         } else {
             this.data[variableName] = value;
@@ -162,8 +174,8 @@ class Resonant {
             return value;
         }
         var found = localStorage.getItem('res_' + variableName);
-        if (found !== null && found !== undefined){
-            return JSON.parse(localStorage.getItem('res_' + variableName));
+        if (found !== null && found !== undefined) {
+            return JSON.parse(found);
         } else {
             localStorage.setItem('res_' + variableName, JSON.stringify(value));
             return value;
@@ -182,6 +194,10 @@ class Resonant {
         });
     }
 
+    _resolveValue(instance, key, override = null) {
+        return override ?? instance[key];
+    }
+
     _createObject(variableName, obj) {
         obj[Symbol('isProxy')] = true;
         return new Proxy(obj, {
@@ -196,15 +212,56 @@ class Resonant {
         });
     }
 
+    _evaluateDisplayCondition(element, item, condition) {
+        try {
+            const show = new Function('item', `return ${condition}`)(item);
+            element.style.display = show ? '' : 'none';
+        } catch (e) {
+            console.error(`Error evaluating display condition: ${condition}`, e);
+        }
+    }
+
+    _handleDisplayElements(parentElement, instance) {
+        const displayElements = parentElement.querySelectorAll('[res-display]');
+        displayElements.forEach(displayEl => {
+            const condition = displayEl.getAttribute('res-display') || '';
+            this._evaluateDisplayCondition(displayEl, instance, condition);
+        });
+    }
+
+    _bindClickEvents(parentElement, instance, arrayValue) {
+        const onclickElements = parentElement.querySelectorAll('[res-onclick], [res-onclick-remove]');
+        onclickElements.forEach(onclickEl => {
+            const functionName = onclickEl.getAttribute('res-onclick');
+            const removeKey = onclickEl.getAttribute('res-onclick-remove');
+
+            if (functionName) {
+                onclickEl.onclick = () => {
+                    const func = new Function('item', `return ${functionName}(item)`);
+                    func(instance);
+                };
+            }
+            if (removeKey) {
+                onclickEl.onclick = () => {
+                    if (arrayValue) {
+                        const removeIdx = arrayValue.findIndex(t => t[removeKey] === instance[removeKey]);
+                        if (removeIdx !== -1) {
+                            arrayValue.splice(removeIdx, 1);
+                        }
+                    }
+                };
+            }
+        });
+    }
+
     _defineProperty(variableName) {
         Object.defineProperty(window, variableName, {
             get: () => this.data[variableName],
             set: (newValue) => {
                 if (Array.isArray(newValue)) {
                     this.data[variableName] = new ObservableArray(variableName, this, ...newValue);
-                    this.arrayDataChangeDetection[variableName] = this.data[variableName].slice(); // Create a copy for change detection
-
-                } else if (typeof newValue === 'object') {
+                    this.arrayDataChangeDetection[variableName] = this.data[variableName].slice();
+                } else if (typeof newValue === 'object' && newValue !== null) {
                     this.data[variableName] = this._createObject(variableName, newValue);
                 } else {
                     this.data[variableName] = newValue;
@@ -212,7 +269,8 @@ class Resonant {
                 this.updateElement(variableName);
                 this.updateDisplayConditionalsFor(variableName);
                 this.updateStylesFor(variableName);
-                if (!Array.isArray(newValue) && typeof newValue !== 'object') {
+
+                if (!Array.isArray(newValue) && (typeof newValue !== 'object' || newValue === null)) {
                     this._queueUpdate(variableName, 'modified', this.data[variableName]);
                 }
             }
@@ -223,7 +281,6 @@ class Resonant {
         if (!this.pendingUpdates.has(variableName)) {
             this.pendingUpdates.set(variableName, []);
         }
-
         this.pendingUpdates.get(variableName).push({ action, item, property, oldValue });
 
         if (this.pendingUpdates.get(variableName).length === 1) {
@@ -232,10 +289,14 @@ class Resonant {
                 this.updatePersistantData(variableName);
                 this.pendingUpdates.delete(variableName);
 
-                updates = updates.filter((v, i, a) => a.findIndex(t => (t.property === v.property && t.action === v.action)) === i);
+                updates = updates.filter((v, i, a) =>
+                    a.findIndex(t => (t.property === v.property && t.action === v.action)) === i
+                );
+
                 updates.forEach(update => {
                     this._triggerCallbacks(variableName, update);
                 });
+
                 this.updateElement(variableName);
                 this.updateDisplayConditionalsFor(variableName);
                 this.updateStylesFor(variableName);
@@ -257,20 +318,27 @@ class Resonant {
         const value = this.data[variableName];
 
         elements.forEach(element => {
-            if (Array.isArray(value)) {
-                element.querySelectorAll(`[res="${variableName}"][res-rendered=true]`).forEach(el => el.remove());
+            if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+                this._handleInputElement(element, value, (newValue) => {
+                    this.data[variableName] = newValue;
+                    this._queueUpdate(variableName, 'modified', this.data[variableName]);
+                });
+            }
+            else if (Array.isArray(value)) {
+                element.querySelectorAll(`[res="${variableName}"][res-rendered="true"]`).forEach(el => el.remove());
                 this._renderArray(variableName, element);
             }
-            else if (typeof value === 'object') {
-                const subElements = element.querySelectorAll(`[res-prop]`);
+            else if (typeof value === 'object' && value !== null) {
+                const subElements = element.querySelectorAll('[res-prop]');
                 subElements.forEach(subEl => {
                     const key = subEl.getAttribute('res-prop');
                     if (key && key in value) {
-                        this.renderElement(subEl, value, key, variableName);
+                        this._renderObjectProperty(subEl, value[key], variableName, key);
                     }
                 });
-            } else {
-                this.renderElement(element, value, "", variableName);
+            }
+            else {
+                element.innerHTML = value ?? '';
             }
         });
 
@@ -278,73 +346,128 @@ class Resonant {
         this.updateStylesFor(variableName);
     }
 
-    renderElement(element, value, key, variableName, overrideElementValue, isFromArray = false) {
-        let elementValue = value;
-
-        if (key) {
-            elementValue = value[key];
+    _renderObjectProperty(subEl, propValue, parentVarName, key) {
+        if ((subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') &&
+            !Array.isArray(propValue) &&
+            typeof propValue !== 'object') {
+            this._handleInputElement(subEl, propValue, (newValue) => {
+                window[parentVarName][key] = newValue;
+            });
         }
-
-        if (overrideElementValue) {
-            elementValue = overrideElementValue;
+        else if (Array.isArray(propValue)) {
+            this._renderNestedArray(subEl, propValue);
         }
-
-        let updateReference = (newValue) => {
-            if (isFromArray) {
-                if (key) {
-                    value[key] = newValue;
-                } else {
-                    value = newValue;
+        else if (typeof propValue === 'object' && propValue !== null) {
+            const nestedElements = subEl.querySelectorAll('[res-prop]');
+            nestedElements.forEach(nestedEl => {
+                const nestedKey = nestedEl.getAttribute('res-prop');
+                if (nestedKey && nestedKey in propValue) {
+                    this._renderObjectProperty(nestedEl, propValue[nestedKey], parentVarName, nestedKey);
                 }
-            } else {
-                if (key && variableName) {
-                    this.data[variableName][key] = newValue;
-                } else if (variableName) {
-                    this.data[variableName] = newValue;
-                } else {
-                    this.data[key] = newValue;
-                }
-            }
-        };
+            });
+        }
+        else {
+            subEl.innerHTML = propValue ?? '';
+        }
+    }
 
-        if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
-            if (element.type === 'checkbox') {
-                element.checked = elementValue;
-                element.onchange = () => {
-                    updateReference(element.checked);
-                };
-            } else {
-                element.value = elementValue;
-                element.oninput = () => {
-                    updateReference(element.value);
-                };
-            }
-        } else if (element.tagName === 'IMG') {
-            element.src = elementValue;
+    _renderArray(variableName, el) {
+        let template = el.cloneNode(true);
+        el.innerHTML = '';
+
+        if (!window[variableName + "_template"]) {
+            window[variableName + "_template"] = template;
         } else {
-            element.innerHTML = elementValue;
+            template = window[variableName + "_template"];
         }
+
+        this.data[variableName].forEach((instance, index) => {
+            const clonedEl = template.cloneNode(true);
+            clonedEl.setAttribute("res-index", index);
+
+            for (let key in instance) {
+                let overrideInstanceValue = null;
+                let subEl = clonedEl.querySelector(`[res-prop="${key}"]`);
+                if (!subEl) {
+                    subEl = clonedEl.querySelector('[res-prop=""]');
+                    overrideInstanceValue = instance;
+                }
+                if (subEl) {
+                    const value = this._resolveValue(instance, key, overrideInstanceValue);
+
+                    if ((subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') &&
+                        !Array.isArray(value) &&
+                        typeof value !== 'object') {
+                        this._handleInputElement(
+                            subEl,
+                            value,
+                            (newValue) => {
+                                instance[key] = newValue;
+                                this._queueUpdate(variableName, 'modified', instance, key, value);
+                            }
+                        );
+                    }
+                    else if (Array.isArray(value)) {
+                        this._renderNestedArray(subEl, value);
+                    }
+                    else if (typeof value === 'object' && value !== null) {
+                        const nestedElements = subEl.querySelectorAll('[res-prop]');
+                        nestedElements.forEach(nestedEl => {
+                            const nestedKey = nestedEl.getAttribute('res-prop');
+                            if (nestedKey && nestedKey in value) {
+                                this._renderObjectProperty(nestedEl, value[nestedKey], variableName, nestedKey);
+                            }
+                        });
+                    }
+                    else {
+                        subEl.innerHTML = value ?? '';
+                    }
+                }
+            }
+
+            this._handleDisplayElements(clonedEl, instance);
+            this._bindClickEvents(clonedEl, instance, this.data[variableName]);
+
+            clonedEl.setAttribute("res-rendered", "true");
+            el.appendChild(clonedEl);
+        });
+    }
+
+    _renderNestedArray(subEl, arrayValue) {
+        const template = subEl.cloneNode(true);
+        subEl.innerHTML = '';
+
+        subEl.removeAttribute('res-prop');
+
+        arrayValue.forEach((item, idx) => {
+            const cloned = template.cloneNode(true);
+            cloned.setAttribute('res-rendered', 'true');
+
+            const nestedEls = cloned.querySelectorAll('[res-prop]');
+            nestedEls.forEach(nestedEl => {
+                const nestedKey = nestedEl.getAttribute('res-prop');
+                if (nestedKey && nestedKey in item) {
+                    this._renderObjectProperty(nestedEl, item[nestedKey], null, nestedKey);
+                }
+            });
+
+            this._handleDisplayElements(cloned, item);
+            this._bindClickEvents(cloned, item, arrayValue);
+
+            subEl.appendChild(cloned);
+        });
     }
 
     updateDisplayConditionalsFor(variableName) {
         const conditionalElements = document.querySelectorAll(`[res-display*="${variableName}"]`);
         conditionalElements.forEach(conditionalElement => {
             const condition = conditionalElement.getAttribute('res-display');
-            try {
-                if (eval(condition)) {
-                    conditionalElement.style.display = '';
-                } else {
-                    conditionalElement.style.display = 'none';
-                }
-            } catch (e) {
-                console.error(`Error evaluating condition for ${variableName}: ${condition}`, e);
-            }
+            this._evaluateDisplayCondition(conditionalElement, this.data[variableName], condition);
         });
     }
 
     updateStylesFor(variableName) {
         const styleElements = document.querySelectorAll(`[res-style*="${variableName}"]`);
-
         styleElements.forEach(styleElement => {
             let styleCondition = styleElement.getAttribute('res-style');
             try {
@@ -367,23 +490,21 @@ class Resonant {
                     const item = this.data[variableName][index];
                     styleCondition = styleCondition.replace(new RegExp(`\\b${variableName}\\b`, 'g'), 'item');
                     const styleClass = new Function('item', `return ${styleCondition}`)(item);
-
                     if (styleClass) {
                         styleElement.classList.add(styleClass);
                     } else {
-                        var elementHasStyle = styleElement.classList.contains(styleClass);
+                        const elementHasStyle = styleElement.classList.contains(styleClass);
                         if (elementHasStyle) {
                             styleElement.classList.remove(styleClass);
                         }
                     }
                 } else {
                     const styleClass = eval(styleCondition);
-
                     if (styleClass) {
                         styleElement.classList.add(styleClass);
                         styleElement.setAttribute('res-styles', styleClass);
                     } else {
-                        var elementHasStyle = styleElement.classList.contains(styleClass);
+                        const elementHasStyle = styleElement.classList.contains(styleClass);
                         if (elementHasStyle) {
                             styleElement.classList.remove(styleClass);
                         }
@@ -392,57 +513,6 @@ class Resonant {
             } catch (e) {
                 console.error(`Error evaluating style for ${variableName}: ${styleCondition}`, e);
             }
-        });
-    }
-
-    _renderArray(variableName, el) {
-        let template = el.cloneNode(true);
-        el.innerHTML = '';
-
-        if (!window[variableName + "_template"]) {
-            window[variableName + "_template"] = template;
-        } else {
-            template = window[variableName + "_template"];
-        }
-
-        this.data[variableName].forEach((instance, index) => {
-            const clonedEl = template.cloneNode(true);
-            clonedEl.setAttribute("res-index", index);
-            for (let key in instance) {
-                let overrideInstanceValue = null;
-                let subEl = clonedEl.querySelector(`[res-prop="${key}"]`);
-                if(!subEl) {
-                    subEl = clonedEl.querySelector(`[res-prop=""]`);
-                    overrideInstanceValue = instance;
-                }
-                if (subEl) {
-                    this.renderElement(subEl, instance, key, variableName, overrideInstanceValue, true);
-                }
-            }
-
-            const onclickElements = clonedEl.querySelectorAll('[res-onclick], [res-onclick-remove]');
-            onclickElements.forEach(onclickEl => {
-                const functionName = onclickEl.getAttribute('res-onclick');
-                const removeKey = onclickEl.getAttribute('res-onclick-remove');
-                if (functionName) {
-                    onclickEl.onclick = () => {
-                        const func = new Function('item', `return ${functionName}(item)`);
-                        func(instance);
-                    };
-                }
-
-                if (removeKey) {
-                    onclickEl.onclick = () => {
-                        const index = this.data[variableName].findIndex(t => t[removeKey] === instance[removeKey]);
-                        if (index !== -1) {
-                            this.data[variableName].splice(index, 1);
-                        }
-                    };
-                }
-            });
-
-            clonedEl.setAttribute("res-rendered", true);
-            el.appendChild(clonedEl);
         });
     }
 
