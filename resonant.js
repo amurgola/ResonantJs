@@ -13,6 +13,7 @@ class ObservableArray extends Array {
 
         this.forEach((item, index) => {
             if (typeof item === 'object') {
+                this._setKeyForObjectAndChildObjects(item, index);
                 this[index] = this._createProxy(item, index);
             }
         });
@@ -22,12 +23,53 @@ class ObservableArray extends Array {
         }
     }
 
+    _setKeyForObjectAndChildObjects(obj, index) {
+        if (typeof obj === 'object') {
+            obj.key = index + '-' + this._generateKeyByContentCheckSum(obj);
+            Object.keys(obj).forEach(key => {
+                this._setKeyForObjectAndChildObjects(obj[key], index);
+            });
+        }
+    }
+
+    _generateKeyByContentCheckSum(obj) {
+        const removeKeysRecursively = (obj) => {
+            if (!obj || typeof obj !== 'object') return obj;
+
+            if (Array.isArray(obj)) {
+                return obj.map(item => removeKeysRecursively(item));
+            }
+
+            const newObj = {...obj};
+            delete newObj.key;
+
+            Object.keys(newObj).forEach(key => {
+                if (typeof newObj[key] === 'object' && newObj[key] !== null) {
+                    newObj[key] = removeKeysRecursively(newObj[key]);
+                }
+            });
+
+            return newObj;
+        };
+
+        const objForHash = removeKeysRecursively(obj);
+        const str = JSON.stringify(objForHash);
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return Math.abs(hash).toString(36);
+    }
+
     _createProxy(item, index) {
         return new Proxy(item, {
             set: (target, property, value) => {
                 if (target[property] !== value) {
                     const oldValue = target[property];
                     target[property] = value;
+                    this._setKeyForObjectAndChildObjects(item, index);
                     this.resonantInstance._queueUpdate(this.variableName, 'modified', target, property, oldValue, index);
                 }
                 return true;
@@ -36,6 +78,10 @@ class ObservableArray extends Array {
     }
 
     forceUpdate() {
+        this.forEach((item, index) => {
+            console.log('forceUpdate', item, index);
+            this._setKeyForObjectAndChildObjects(item, index);
+        });
         this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
         this.resonantInstance._queueUpdate(this.variableName, 'modified', this.slice());
     }
@@ -48,6 +94,7 @@ class ObservableArray extends Array {
     push(...args) {
         args = args.map((item, index) => {
             if (typeof item === 'object') {
+                this._setKeyForObjectAndChildObjects(item, this.length + index);
                 return this._createProxy(item, this.length + index);
             }
             return item;
@@ -372,67 +419,91 @@ class Resonant {
     }
 
     _renderArray(variableName, el) {
-        let template = el.cloneNode(true);
-        el.innerHTML = '';
+        const container = el.hasAttribute('res') && el.parentElement ? el.parentElement : el;
 
+        let template;
         if (!window[variableName + "_template"]) {
+            template = el.cloneNode(true);
             window[variableName + "_template"] = template;
+            el.style.display = 'none';
+            el.setAttribute('res-template', 'true');
         } else {
             template = window[variableName + "_template"];
         }
 
+        const existingElements = new Map();
+        container.querySelectorAll(`[res="${variableName}"][res-rendered="true"]`).forEach(element => {
+            const key = element.getAttribute('res-key');
+            if (key) {
+                existingElements.set(key, element);
+            }
+        });
+
+        container.querySelectorAll(`[res="${variableName}"][res-rendered="true"]`).forEach(el => el.remove());
+
         this.data[variableName].forEach((instance, index) => {
-            const clonedEl = template.cloneNode(true);
-            clonedEl.setAttribute("res-index", index);
+            const elementKey = instance.key;
+            let elementToUse;
 
-            for (let key in instance) {
-                let overrideInstanceValue = null;
-                let subEl = clonedEl.querySelector(`[res-prop="${key}"]`);
-                if (!subEl) {
-                    subEl = clonedEl.querySelector('[res-prop=""]');
-                    overrideInstanceValue = instance;
-                }
-                if (subEl) {
-                    const value = this._resolveValue(instance, key, overrideInstanceValue);
+            if (existingElements.has(elementKey)) {
+                elementToUse = existingElements.get(elementKey);
+                existingElements.delete(elementKey);
+                elementToUse.setAttribute("res-index", index);
+            } else {
+                elementToUse = template.cloneNode(true);
+                elementToUse.removeAttribute('res-template');
+                elementToUse.style.display = '';
+                elementToUse.setAttribute("res-rendered", "true");
+                elementToUse.setAttribute("res-key", elementKey);
+                elementToUse.setAttribute("res-index", index);
 
-                    if ((subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') &&
-                        !Array.isArray(value) &&
-                        typeof value !== 'object') {
-                        this._handleInputElement(
-                            subEl,
-                            value,
-                            (newValue) => {
-                                instance[key] = newValue;
-                                this._queueUpdate(variableName, 'modified', instance, key, value);
-                            }
-                        );
+                for (let key in instance) {
+                    let overrideInstanceValue = null;
+                    let subEl = elementToUse.querySelector(`[res-prop="${key}"]`);
+                    if (!subEl) {
+                        subEl = elementToUse.querySelector('[res-prop=""]');
+                        overrideInstanceValue = instance;
                     }
-                    else if (Array.isArray(value)) {
-                        this._renderNestedArray(subEl, value);
-                    }
-                    else if (typeof value === 'object' && value !== null) {
-                        const nestedElements = subEl.querySelectorAll('[res-prop]');
-                        nestedElements.forEach(nestedEl => {
-                            const nestedKey = nestedEl.getAttribute('res-prop');
-                            if (nestedKey && nestedKey in value) {
-                                this._renderObjectProperty(nestedEl, value[nestedKey], variableName, nestedKey);
-                            }
-                        });
-                    }
-                    else {
-                        subEl.innerHTML = value ?? '';
+                    if (subEl) {
+                        const value = this._resolveValue(instance, key, overrideInstanceValue);
+
+                        if ((subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') &&
+                            !Array.isArray(value) &&
+                            typeof value !== 'object') {
+                            this._handleInputElement(
+                                subEl,
+                                value,
+                                (newValue) => {
+                                    instance[key] = newValue;
+                                    this._queueUpdate(variableName, 'modified', instance, key, value);
+                                }
+                            );
+                        }
+                        else if (Array.isArray(value)) {
+                            this._renderNestedArray(subEl, value);
+                        }
+                        else if (typeof value === 'object' && value !== null) {
+                            const nestedElements = subEl.querySelectorAll('[res-prop]');
+                            nestedElements.forEach(nestedEl => {
+                                const nestedKey = nestedEl.getAttribute('res-prop');
+                                if (nestedKey && nestedKey in value) {
+                                    this._renderObjectProperty(nestedEl, value[nestedKey], variableName, nestedKey);
+                                }
+                            });
+                        }
+                        else {
+                            subEl.innerHTML = value ?? '';
+                        }
                     }
                 }
             }
 
-            this._handleDisplayElements(clonedEl, instance);
-            this._bindClickEvents(clonedEl, instance, this.data[variableName]);
+            this._handleDisplayElements(elementToUse, instance);
+            this._bindClickEvents(elementToUse, instance, this.data[variableName]);
 
-            clonedEl.setAttribute("res-rendered", "true");
-            el.appendChild(clonedEl);
+            container.appendChild(elementToUse);
         });
     }
-
     _renderNestedArray(subEl, arrayValue) {
         const template = subEl.cloneNode(true);
         subEl.innerHTML = '';
@@ -457,7 +528,6 @@ class Resonant {
             subEl.appendChild(cloned);
         });
     }
-
     updateDisplayConditionalsFor(variableName) {
         const conditionalElements = document.querySelectorAll(`[res-display*="${variableName}"]`);
         conditionalElements.forEach(conditionalElement => {
