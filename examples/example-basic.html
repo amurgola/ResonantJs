@@ -102,8 +102,8 @@
     <section class="grid">
         <div>
             <h2>Project Members</h2>
-            <ul res="projectTeam">
-                <li>
+            <ul>
+                <li res="projectTeam">
                     <span res-prop="name"></span> - <span res-prop="role"></span>
                 </li>
             </ul>
@@ -206,6 +206,8 @@
             { name: "Bob", role: "Designer" }
         ]
     });
+
+
 
     // Chain together callbacks
     resonantJs.addCallback("user", (user) => {

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Resonant.js Practical Demo</title>
+    <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css"
+    />
+    <script src="../resonant.js"></script>
+    <style>
+        .success {
+            background-color: #0172ad;
+        }
+        .fail {
+            background-color: #883935;
+        }
+        section.grid {
+            padding: 1rem;
+            margin-bottom: 2rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+<main class="container">
+    <h1>Variable/Object/Array update tests</h1>
+    <section class="grid">
+        <div>
+            <h2>Basic Variable: <span res="basicVariable"></span></h2>
+            <div res-display="basicVariable == 'Initial'">
+                Has not been updated yet
+            </div>
+            <div res-display="basicVariable != 'Initial'">
+                Has been updated
+            </div>
+        </div>
+        <div>
+            <button class="runTest" data-type="basicVariable">Run Test</button>
+        </div>
+    </section>
+    <section class="grid">
+        <div res="simpleObject">
+            <h2>Simple Object: </h2>
+                First Name: <span res-prop="firstName"></span>
+                Last Name: <span res-prop="lastName"></span>
+
+            <div res-display="firstName == 'John'">
+                Has not been updated yet
+            </div>
+            <div res-display="firstName != 'John'">
+                Has been updated
+            </div>
+        </div>
+        <div>
+            <button class="runTest" data-type="simpleObject">Run Test</button>
+        </div>
+    </section>
+    <section class="grid">
+        <div>
+            <h2>Simple Array Update: </h2>
+            <ul>
+                <li res="simpleArrayUpdate">
+                    <span res-prop="firstName"></span> <span res-prop="lastName"></span>
+                </li>
+            </ul>
+
+            <div res-display="simpleArrayUpdate[0].firstName == 'John'">
+                Has not been updated yet
+            </div>
+            <div res-display="simpleArrayUpdate[0].firstName != 'John'">
+                Has been updated
+            </div>
+        </div>
+        <div>
+            <button class="runTest" data-type="simpleArrayUpdate">Run Test</button>
+        </div>
+    </section>
+    <section class="grid">
+        <div>
+            <h2>Simple Array Add: </h2>
+            <ul>
+                <li res="simpleArrayAdd">
+                    <span res-prop="firstName"></span> <span res-prop="lastName"></span>
+                </li>
+            </ul>
+
+            <div res-display="simpleArrayAdd[2] === undefined">
+                Has not been updated yet
+            </div>
+            <div res-display="simpleArrayAdd[2] !== undefined">
+                Has been updated
+            </div>
+        </div>
+        <div>
+            <button class="runTest" data-type="simpleArrayAdd">Run Test</button>
+        </div>
+    </section>
+    <section class="grid">
+        <div>
+            <h2>Simple Array Remove: </h2>
+            <ul>
+                <li res="simpleArrayRemove">
+                    <span res-prop="firstName"></span> <span res-prop="lastName"></span>
+                </li>
+            </ul>
+
+            <div res-display="simpleArrayRemove[0].firstName == 'John'">
+                Has not been updated yet
+            </div>
+            <div res-display="simpleArrayRemove[0].firstName != 'John'">
+                Has been updated
+            </div>
+        </div>
+        <div>
+            <button class="runTest" data-type="simpleArrayRemove">Run Test</button>
+        </div>
+    </section>
+    <section class="grid">
+        <div>
+            <h2>Complex Array With Children Update: </h2>
+            <hr>
+            <div>
+                <div res="complexArrayWithChildrenUpdate">
+                    <h3><span res-prop="firstName"></span> <span res-prop="lastName"></span></h3>
+
+                    Phone Numbers:
+                    <ul>
+                        <li res-prop="phoneNumbers">
+                        </li>
+                    </ul>
+                    Addresses
+                    <ul>
+                        <li res-prop="addresses">
+                            <span res-prop="city"></span>,
+                            <span res-prop="state"></span>
+                        </li>
+                    </ul>
+                    <hr>
+                </div>
+            </div>
+
+
+            <div res-display="complexArrayWithChildrenUpdate[0].firstName == 'John'">
+                Has not been updated yet
+            </div>
+            <div res-display="complexArrayWithChildrenUpdate[0].firstName != 'John'">
+                Has been updated
+            </div>
+        </div>
+        <div>
+            <button class="runTest" data-type="complexArrayWithChildrenUpdate">Run Test</button>
+        </div>
+    </section>
+    <section class="grid">
+        <div>
+            <h2>Complex Array With Children Display Update: </h2>
+            <hr>
+            <div>
+                <div res="complexArrayWithChildrenDisplayUpdate">
+                    <h3><span res-prop="firstName"></span> <span res-prop="lastName"></span></h3>
+
+                    <div res-display="attributes.showOnPage">
+                        Show on page
+                    </div>
+                    <hr>
+                </div>
+            </div>
+        </div>
+        <div>
+            <button class="runTest" data-type="complexArrayWithChildrenDisplayUpdate">Run Test</button>
+        </div>
+    </section>
+    <section class="grid">
+        <div>
+            <h2>Complex Array With Arrays Display Test: </h2>
+            <hr>
+            <div>
+                <div res="complexArrayWithArrayDisplayUpdate">
+                    <h3>
+                        <span res-prop="firstName"></span>
+                        <span res-prop="lastName"></span>
+                    </h3>
+
+                    <div res-prop="attributes">
+                        <div res-prop="name">
+                        </div>
+                        <div res-display="showOnPage">
+                            Show on page
+                        </div>
+                    </div>
+                    <hr>
+                </div>
+            </div>
+        </div>
+        <div>
+            <button class="runTest" data-type="complexArrayWithArrayDisplayUpdate">Run Test</button>
+        </div>
+    </section>
+    <button onclick="runAllTests()">Run All Tests</button>
+</main>
+
+<script>
+    const resonantJs = new Resonant();
+    resonantJs.add("basicVariable", "Initial");
+    resonantJs.add("simpleObject", {
+        firstName: "John",
+        lastName: "Doe"
+    });
+    resonantJs.add("simpleArrayUpdate", [
+        {
+            firstName: "John",
+            lastName: "Doe"
+        },
+        {
+            firstName: "Jane",
+            lastName: "Doe"
+        }
+    ]);
+    resonantJs.add("simpleArrayAdd", [
+        {
+            firstName: "John",
+            lastName: "Doe"
+        },
+        {
+            firstName: "Jane",
+            lastName: "Doe"
+        }
+    ]);
+    resonantJs.add("simpleArrayRemove", [
+        {
+            firstName: "John",
+            lastName: "Doe"
+        },
+        {
+            firstName: "Jane",
+            lastName: "Doe"
+        }
+    ]);
+    resonantJs.add("complexArrayWithChildrenUpdate", [
+        {
+            firstName: "Michael",
+            lastName: "Smith",
+            phoneNumbers: [
+                "555-123-4567",
+                "555-987-6543"
+            ],
+            addresses: [
+                {
+                    city: "Chicago",
+                    state: "IL"
+                },
+                {
+                    city: "Seattle",
+                    state: "WA"
+                },
+                {
+                    city: "New York",
+                    state: "NY"
+                }
+            ]
+        },
+        {
+            firstName: "Sarah",
+            lastName: "Johnson",
+            phoneNumbers: [
+                "555-234-5678",
+                "555-876-5432",
+                "555-345-6789"
+            ],
+            addresses: [
+                {
+                    city: "Boston",
+                    state: "MA"
+                },
+                {
+                    city: "Austin",
+                    state: "TX"
+                }
+            ]
+        }
+    ]);
+    resonantJs.add("complexArrayWithChildrenDisplayUpdate", [
+        {
+            firstName: "Michael",
+            lastName: "Smith",
+            attributes:
+                {
+                    showOnPage: true
+                }
+        },
+        {
+            firstName: "Sarah",
+            lastName: "Johnson",
+            attributes:
+                {
+                    showOnPage: true
+                }
+        }
+    ]);
+    resonantJs.add("complexArrayWithArrayDisplayUpdate", [
+        {
+            firstName: "Michael",
+            lastName: "Smith",
+            attributes: [
+                {
+                    name: "Personal",
+                    showOnPage: true
+                },
+                {
+                    name: "Not Personal",
+                    showOnPage: true
+                }]
+        }
+    ]);
+
+    function runAllTests() {
+        let tests = document.querySelectorAll(".runTest");
+        tests.forEach(test => {
+            test.click();
+        });
+    }
+
+    function runTest() {
+
+        //hide button
+        this.style.display = "none";
+
+        let parentElement = this.parentElement.parentElement;
+        let dataAttribute = this.getAttribute("data-type");
+        let expectedText = "";
+
+        console.log("Parent element inner text: ", parentElement.innerText);
+
+        if(dataAttribute === "basicVariable") {
+            basicVariable = "Updated";
+
+            expectedText = `Basic Variable: Updated
+                Has been updated`;
+        }
+
+        if(dataAttribute === "simpleObject") {
+            simpleObject.firstName = "Jane";
+            simpleObject.lastName = "Doe";
+
+            expectedText = `Simple Object:
+                First Name: Jane
+                Last Name: Doe
+                Has been updated`;
+        }
+
+        if(dataAttribute === "simpleArrayUpdate") {
+            simpleArrayUpdate[0].firstName = "Josh";
+            simpleArrayUpdate[0].lastName = "Forger";
+            simpleArrayUpdate[1].firstName = "Matilda";
+            simpleArrayUpdate[1].lastName = "Swinson";
+
+            expectedText = `Simple Array Update:
+                Josh Forger
+                Matilda Swinson
+                Has been updated`;
+        }
+
+        if(dataAttribute === "simpleArrayAdd") {
+            simpleArrayAdd.push({
+                firstName: "Josh",
+                lastName: "Forger"
+            });
+
+            expectedText = `Simple Array Add:
+                John Doe
+                Jane Doe
+                Josh Forger
+                Has been updated`;
+        }
+
+        if(dataAttribute === "simpleArrayRemove") {
+            simpleArrayRemove.splice(0, 1);
+
+            expectedText = `Simple Array Remove:
+                Jane Doe
+                Has been updated`;
+        }
+
+        if(dataAttribute === "complexArrayWithChildrenUpdate") {
+            complexArrayWithChildrenUpdate[0].firstName = "Josh";
+            complexArrayWithChildrenUpdate[0].lastName = "Forger";
+            complexArrayWithChildrenUpdate[0].phoneNumbers[0] = "123-123-1234";
+            complexArrayWithChildrenUpdate[0].addresses[1].city = "Hudson";
+            complexArrayWithChildrenUpdate[0].addresses[1].state = "OH";
+
+            expectedText = `Complex Array With Children Update:
+                Josh Forger
+                Phone Numbers:
+                    123-123-1234
+                    555-987-6543
+                Addresses
+                    Chicago, IL
+                    Hudson, OH
+                    New York, NY
+                Sarah Johnson
+                Phone Numbers:
+                    555-234-5678
+                    555-876-5432
+                    555-345-6789
+                Addresses
+                    Boston, MA
+                    Austin, TX
+                Has been updated
+                `;
+        }
+
+        if(dataAttribute === "complexArrayWithChildrenDisplayUpdate") {
+            complexArrayWithChildrenDisplayUpdate[0].attributes.showOnPage = false;
+            // requires a force update unfortunately
+            complexArrayWithChildrenDisplayUpdate.forceUpdate();
+
+            expectedText = `Complex Array With Children Display Update:
+                Michael Smith
+                Sarah Johnson
+                Show on page
+                `;
+        }
+
+        setTimeout(() => {
+            visibleTextCompare(parentElement,expectedText);
+        }, 1000)
+    }
+
+    document.querySelectorAll(".runTest").forEach(test => {
+        test.addEventListener("click", runTest);
+    });
+
+    function visibleTextCompare(element, expectedText) {
+        let visibleText = element.innerText;
+
+        visibleText = visibleText.replace(/\s/g, "").replace("RunTest", "");
+        expectedText = expectedText.replace(/\s/g, "").replace("RunTest", "");
+
+        let result = visibleText === expectedText;
+
+        if(!result) {
+            console.log("Visible text: ", visibleText);
+            console.log("Expected text: ", expectedText);
+        }
+
+        element.classList.add(result ? "success" : "fail");
+    }
+</script>
+</body>
+</html>

@@ -79,7 +79,6 @@ class ObservableArray extends Array {
 
     forceUpdate() {
         this.forEach((item, index) => {
-            console.log('forceUpdate', item, index);
             this._setKeyForObjectAndChildObjects(item, index);
         });
         this.resonantInstance.arrayDataChangeDetection[this.variableName] = this.slice();
@@ -259,10 +258,60 @@ class Resonant {
         });
     }
 
-    _evaluateDisplayCondition(element, item, condition) {
+    _evaluateDisplayCondition(element, instance, condition) {
         try {
-            const show = new Function('item', `return ${condition}`)(item);
-            element.style.display = show ? '' : 'none';
+            let parent = element.parentElement;
+            let parentResName = null;
+            let arrayIndex = null;
+
+            while (parent && !parentResName) {
+                parentResName = parent.getAttribute('res');
+                if (!arrayIndex) {
+                    arrayIndex = parent.getAttribute('res-index');
+                }
+                parent = parent.parentElement;
+            }
+
+            // For array items, use the specific array element as instance
+            if (parentResName && arrayIndex !== null && Array.isArray(this.data[parentResName])) {
+                instance = this.data[parentResName][arrayIndex];
+            }
+
+            // For object properties without parent reference
+            if (parentResName && !condition.includes(parentResName + '.')) {
+                const propNames = condition.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
+                propNames.forEach(prop => {
+                    if (prop === '==' || prop === '!=' || !(prop in instance)) return;
+
+                    const regex = new RegExp(`\\b${prop}\\b`, 'g');
+                    const propValue = instance[prop];
+
+                    if (propValue === undefined) {
+                        // Keep as is - property doesn't exist
+                        return;
+                    }
+
+                    // Determine correct property access path
+                    if (instance['item.' + prop] !== undefined) {
+                        condition = condition.replace(regex, `item.${prop}`);
+                    } else if (typeof propValue === 'object') {
+                        condition = condition.replace(regex, `${parentResName}.${prop}`);
+                    }
+                });
+            }
+
+            let show = false;
+            try{
+                show = new Function('item', `return ${condition}`)(instance);
+            } catch(e) {
+
+                const firstPeriodIndex = condition.indexOf('.');
+                const conditionAfterFirstPeriod = condition.substring(firstPeriodIndex + 1);
+                show = new Function('item', `return item.${conditionAfterFirstPeriod}`)(instance);
+
+            }
+
+            element.style.display = show ? 'inherit' : 'none';
         } catch (e) {
             console.error(`Error evaluating display condition: ${condition}`, e);
         }
@@ -361,9 +410,9 @@ class Resonant {
     }
 
     updateElement(variableName) {
+
         const elements = document.querySelectorAll(`[res="${variableName}"]`);
         const value = this.data[variableName];
-
         elements.forEach(element => {
             if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
                 this._handleInputElement(element, value, (newValue) => {
@@ -402,7 +451,8 @@ class Resonant {
             });
         }
         else if (Array.isArray(propValue)) {
-            this._renderNestedArray(subEl, propValue);
+            let parentKey = this.data[parentVarName].key;
+            this._renderNestedArray(subEl, propValue, parentKey);
         }
         else if (typeof propValue === 'object' && propValue !== null) {
             const nestedElements = subEl.querySelectorAll('[res-prop]');
@@ -480,7 +530,8 @@ class Resonant {
                             );
                         }
                         else if (Array.isArray(value)) {
-                            this._renderNestedArray(subEl, value);
+                            let parentKey = this.data[variableName][index].key;
+                            this._renderNestedArray(subEl, value, parentKey);
                         }
                         else if (typeof value === 'object' && value !== null) {
                             const nestedElements = subEl.querySelectorAll('[res-prop]');
@@ -504,7 +555,7 @@ class Resonant {
             container.appendChild(elementToUse);
         });
     }
-    _renderNestedArray(subEl, arrayValue) {
+    _renderNestedArray(subEl, arrayValue, parentKey) {
         const template = subEl.cloneNode(true);
         subEl.innerHTML = '';
 
@@ -514,23 +565,39 @@ class Resonant {
             const cloned = template.cloneNode(true);
             cloned.setAttribute('res-rendered', 'true');
 
-            const nestedEls = cloned.querySelectorAll('[res-prop]');
-            nestedEls.forEach(nestedEl => {
-                const nestedKey = nestedEl.getAttribute('res-prop');
-                if (nestedKey && nestedKey in item) {
-                    this._renderObjectProperty(nestedEl, item[nestedKey], null, nestedKey);
+            if (item !== null && typeof item !== 'object') {
+                cloned.innerHTML = item;
+            } else {
+                const nestedEls = cloned.querySelectorAll('[res-prop]');
+                nestedEls.forEach(nestedEl => {
+                    const nestedKey = nestedEl.getAttribute('res-prop');
+                    if (nestedKey && nestedKey in item) {
+                        nestedEl.setAttribute('res-child', item.key + '-' + nestedKey + '--' + parentKey);
+                        this._renderObjectProperty(nestedEl, item[nestedKey], null, nestedKey);
+                    }
+                });
+
+                this._handleDisplayElements(cloned, item);
+                this._bindClickEvents(cloned, item, arrayValue);
+
+                const displayCondition = cloned.getAttribute('res-display');
+                if (displayCondition) {
+                    this._evaluateDisplayCondition(cloned, item, displayCondition);
                 }
-            });
-
-            this._handleDisplayElements(cloned, item);
-            this._bindClickEvents(cloned, item, arrayValue);
-
+            }
             subEl.appendChild(cloned);
         });
     }
+
     updateDisplayConditionalsFor(variableName) {
         const conditionalElements = document.querySelectorAll(`[res-display*="${variableName}"]`);
         conditionalElements.forEach(conditionalElement => {
+            const condition = conditionalElement.getAttribute('res-display');
+            this._evaluateDisplayCondition(conditionalElement, this.data[variableName], condition);
+        });
+
+        const contextElements = document.querySelectorAll(`[res="${variableName}"] [res-display]`);
+        contextElements.forEach(conditionalElement => {
             const condition = conditionalElement.getAttribute('res-display');
             this._evaluateDisplayCondition(conditionalElement, this.data[variableName], condition);
         });
