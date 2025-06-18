@@ -41,10 +41,17 @@ function querySelectorAllInternal(root, selector) {
     return res;
   }
   const conds = [];
-  const regex = /\[([^=\]]+)(?:="?([^\]"]*)"?)?\]/g;
+  const regex = /\[([^\]]+)\]/g;
   let m;
   while ((m = regex.exec(selector)) !== null) {
-    conds.push({name: m[1], value: m[2]});
+    const expr = m[1].trim();
+    const match = expr.match(/^([^*~=]+)(\*=|=)?"?([^"]*)"?$/);
+    if (match) {
+      const name = match[1];
+      const op = match[2] || null;
+      const value = match[3] !== undefined ? match[3] : null;
+      conds.push({ name, value, op });
+    }
   }
   const out = [];
   (function traverse(node){
@@ -52,10 +59,12 @@ function querySelectorAllInternal(root, selector) {
       let ok = true;
       for (const c of conds) {
         const val = node.getAttribute(c.name);
-        if (c.value === undefined) {
+        if (c.op === null) {
           if (val === undefined) { ok = false; break; }
-        } else {
+        } else if (c.op === '=') {
           if (val !== c.value) { ok = false; break; }
+        } else if (c.op === '*=') {
+          if (!val || !val.includes(c.value)) { ok = false; break; }
         }
       }
       if (ok) out.push(node);
