@@ -22,43 +22,25 @@
 
     <section class="grid">
         <h2>Houses</h2>
-        <ul>
-            <li res="houses">
-                <h3>
-                    <input type="text" res-prop="name" />
-                </h3>
-                <div>
-                    <strong>People</strong>
-                    <ul>
-                        <li res-prop="people">
-                            <input type="text" res-prop="name" placeholder="Name" />
-                            <div res-prop="contact">
-                                <input type="text" res-prop="email" placeholder="Email" />
-                                <input type="text" res-prop="phone" placeholder="Phone" />
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-                <div>
-                    <h4>Add Person</h4>
-                    <div res-prop="newPerson">
-                        <input type="text" res-prop="name" placeholder="Name" />
-                        <div res-prop="contact">
-                            <input type="text" res-prop="email" placeholder="Email" />
-                            <input type="text" res-prop="phone" placeholder="Phone" />
-                        </div>
+        <div res="houses">
+            <h3 res-prop="name"></h3>
+            <div res-display="people.length > 0">
+                <h4>People:</h4>
+                <div res-prop="people">
+                    <span res-prop="name"></span>
+                    <br/>
+                    Contact(s):
+                    <div res-prop="contact">
+                        <span res-prop="email"></span>,
+                        <span res-prop="phone"></span>
                     </div>
-                    <button res-onclick="addPerson">Add Person</button>
                 </div>
-                <hr />
-            </li>
-        </ul>
-    </section>
 
-    <section class="grid">
-        <h2>Add House</h2>
-        <input type="text" placeholder="House Name" res="newHouseName" />
-        <button onclick="addHouse()">Add House</button>
+            </div>
+            <div res-display="people.length == 0" class="conditional">
+                No people in this house.
+            </div>
+        </div>
     </section>
 </main>
 
@@ -71,38 +53,17 @@
                 people: [
                     {
                         name: 'John Doe',
-                        contact: { email: 'john@example.com', phone: '123-456-7890' }
+                        contact: [{ email: 'john@example.com', phone: '123-456-7890' },{ email: 'john@asdasdas.com', phone: '123-sss456-7890' }]
                     },
                     {
                         name: 'Jane Doe',
-                        contact: { email: 'jane@example.com', phone: '222-555-1234' }
+                        contact: [{ email: 'jane@example.com', phone: '222-555-1234' }]
                     }
                 ],
                 newPerson: { name: '', contact: { email: '', phone: '' } }
             }
-        ],
-        newHouseName: ''
+        ]
     });
-
-    function addHouse() {
-        if (!newHouseName.trim()) return;
-        houses.push({
-            name: newHouseName,
-            people: [],
-            newPerson: { name: '', contact: { email: '', phone: '' } }
-        });
-        newHouseName = '';
-    }
-
-    function addPerson(house) {
-        const np = house.newPerson;
-        if (!np.name.trim()) return;
-        house.people.push({
-            name: np.name,
-            contact: { email: np.contact.email, phone: np.contact.phone }
-        });
-        house.newPerson = { name: '', contact: { email: '', phone: '' } };
-    }
 </script>
 </body>
 </html>
