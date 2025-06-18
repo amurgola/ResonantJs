@@ -63,18 +63,29 @@ class ObservableArray extends Array {
         return Math.abs(hash).toString(36);
     }
 
-    _createProxy(item, index) {
-        return new Proxy(item, {
-            set: (target, property, value) => {
-                if (target[property] !== value) {
-                    const oldValue = target[property];
-                    target[property] = value;
-                    this._setKeyForObjectAndChildObjects(item, index);
-                    this.resonantInstance._queueUpdate(this.variableName, 'modified', target, property, oldValue, index);
+    _wrapNestedObjects(obj, index) {
+        if (obj && typeof obj === 'object' && !obj.__resonantProxy) {
+            Object.keys(obj).forEach(k => {
+                obj[k] = this._wrapNestedObjects(obj[k], index);
+            });
+            obj.__resonantProxy = true;
+            return new Proxy(obj, {
+                set: (target, prop, value) => {
+                    if (target[prop] !== value) {
+                        const oldValue = target[prop];
+                        target[prop] = this._wrapNestedObjects(value, index);
+                        this._setKeyForObjectAndChildObjects(obj, index);
+                        this.resonantInstance._queueUpdate(this.variableName, 'modified', target, prop, oldValue, index);
+                    }
+                    return true;
                 }
-                return true;
-            }
-        });
+            });
+        }
+        return obj;
+    }
+
+    _createProxy(item, index) {
+        return this._wrapNestedObjects(item, index);
     }
 
     forceUpdate() {
@@ -245,17 +256,26 @@ class Resonant {
     }
 
     _createObject(variableName, obj) {
-        obj[Symbol('isProxy')] = true;
-        return new Proxy(obj, {
-            set: (target, property, value) => {
-                if (target[property] !== value) {
-                    const oldValue = target[property];
-                    target[property] = value;
-                    this._queueUpdate(variableName, 'modified', target, property, oldValue);
-                }
-                return true;
+        const wrap = (o) => {
+            if (o && typeof o === 'object' && !o.__resonantProxy) {
+                Object.keys(o).forEach(k => {
+                    o[k] = wrap(o[k]);
+                });
+                o.__resonantProxy = true;
+                return new Proxy(o, {
+                    set: (target, property, value) => {
+                        if (target[property] !== value) {
+                            const oldValue = target[property];
+                            target[property] = wrap(value);
+                            this._queueUpdate(variableName, 'modified', target, property, oldValue);
+                        }
+                        return true;
+                    }
+                });
             }
-        });
+            return o;
+        };
+        return wrap(obj);
     }
 
     _evaluateDisplayCondition(element, instance, condition) {
@@ -421,6 +441,7 @@ class Resonant {
                 });
             }
             else if (Array.isArray(value)) {
+                if (element.getAttribute('res-rendered') === 'true') return;
                 element.querySelectorAll(`[res="${variableName}"][res-rendered="true"]`).forEach(el => el.remove());
                 this._renderArray(variableName, element);
             }
@@ -505,46 +526,46 @@ class Resonant {
                 elementToUse.style.display = '';
                 elementToUse.setAttribute("res-rendered", "true");
                 elementToUse.setAttribute("res-key", elementKey);
-                elementToUse.setAttribute("res-index", index);
+            }
+            elementToUse.setAttribute("res-index", index);
 
-                for (let key in instance) {
-                    let overrideInstanceValue = null;
-                    let subEl = elementToUse.querySelector(`[res-prop="${key}"]`);
-                    if (!subEl) {
-                        subEl = elementToUse.querySelector('[res-prop=""]');
-                        overrideInstanceValue = instance;
+            for (let key in instance) {
+                let overrideInstanceValue = null;
+                let subEl = elementToUse.querySelector(`[res-prop="${key}"]`);
+                if (!subEl) {
+                    subEl = elementToUse.querySelector('[res-prop=""]');
+                    overrideInstanceValue = instance;
+                }
+                if (subEl) {
+                    const value = this._resolveValue(instance, key, overrideInstanceValue);
+
+                    if ((subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') &&
+                        !Array.isArray(value) &&
+                        typeof value !== 'object') {
+                        this._handleInputElement(
+                            subEl,
+                            value,
+                            (newValue) => {
+                                instance[key] = newValue;
+                                this._queueUpdate(variableName, 'modified', instance, key, value);
+                            }
+                        );
                     }
-                    if (subEl) {
-                        const value = this._resolveValue(instance, key, overrideInstanceValue);
-
-                        if ((subEl.tagName === 'INPUT' || subEl.tagName === 'TEXTAREA') &&
-                            !Array.isArray(value) &&
-                            typeof value !== 'object') {
-                            this._handleInputElement(
-                                subEl,
-                                value,
-                                (newValue) => {
-                                    instance[key] = newValue;
-                                    this._queueUpdate(variableName, 'modified', instance, key, value);
-                                }
-                            );
-                        }
-                        else if (Array.isArray(value)) {
-                            let parentKey = this.data[variableName][index].key;
-                            this._renderNestedArray(subEl, value, parentKey);
-                        }
-                        else if (typeof value === 'object' && value !== null) {
-                            const nestedElements = subEl.querySelectorAll('[res-prop]');
-                            nestedElements.forEach(nestedEl => {
-                                const nestedKey = nestedEl.getAttribute('res-prop');
-                                if (nestedKey && nestedKey in value) {
-                                    this._renderObjectProperty(nestedEl, value[nestedKey], variableName, nestedKey);
-                                }
-                            });
-                        }
-                        else {
-                            subEl.innerHTML = value ?? '';
-                        }
+                    else if (Array.isArray(value)) {
+                        let parentKey = this.data[variableName][index].key;
+                        this._renderNestedArray(subEl, value, parentKey);
+                    }
+                    else if (typeof value === 'object' && value !== null) {
+                        const nestedElements = subEl.querySelectorAll('[res-prop]');
+                        nestedElements.forEach(nestedEl => {
+                            const nestedKey = nestedEl.getAttribute('res-prop');
+                            if (nestedKey && nestedKey in value) {
+                                this._renderObjectProperty(nestedEl, value[nestedKey], variableName, nestedKey);
+                            }
+                        });
+                    }
+                    else {
+                        subEl.innerHTML = value ?? '';
                     }
                 }
             }

@@ -91,3 +91,47 @@ test('template handles array of objects', async () => {
   await new Promise(r=>setTimeout(r,5));
   assert.strictEqual(getSpan().innerHTML,'Jack');
 });
+
+test('template updates array item when child property changes', async () => {
+  const ul = new MockElement('ul');
+  const li = new MockElement('li');
+  li.setAttribute('res','people');
+  const span = new MockElement('span');
+  span.setAttribute('res-prop','name');
+  li.appendChild(span);
+  ul.appendChild(li);
+  const root = ul;
+
+  const { context, resonant } = createResonantDom(root);
+  resonant.add('people',[{name:'John'},{name:'Jane'}]);
+  const getNames = () => Array.from(
+    ul.querySelectorAll('[res-rendered="true"] [res-prop="name"]')
+  ).map(el => el.innerHTML);
+
+  assert.deepStrictEqual(getNames(), ['John','Jane']);
+  context.people[0].name = 'Jack';
+  await new Promise(r=>setTimeout(r,5));
+  assert.deepStrictEqual(getNames(), ['Jack','Jane']);
+});
+
+test('template updates nested object property within array item', async () => {
+  const ul = new MockElement('ul');
+  const li = new MockElement('li');
+  li.setAttribute('res','people');
+  const addressDiv = new MockElement('div');
+  addressDiv.setAttribute('res-prop','address');
+  const lineSpan = new MockElement('span');
+  lineSpan.setAttribute('res-prop','line1');
+  addressDiv.appendChild(lineSpan);
+  li.appendChild(addressDiv);
+  ul.appendChild(li);
+  const root = ul;
+
+  const { context, resonant } = createResonantDom(root);
+  resonant.add('people',[{address:{line1:'a1'}}]);
+  const getLine = () => ul.querySelector('[res-rendered="true"] [res-prop="line1"]');
+  assert.strictEqual(getLine().innerHTML,'a1');
+  context.people[0].address.line1 = 'b2';
+  await new Promise(r=>setTimeout(r,5));
+  assert.strictEqual(getLine().innerHTML,'b2');
+});
