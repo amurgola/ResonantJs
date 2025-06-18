@@ -14,6 +14,7 @@
   },
   "homepage": "https://github.com/amurgola/ResonantJs#readme",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "build": "node scripts/build.js"
   }
 }
