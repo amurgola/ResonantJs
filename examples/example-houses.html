@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Resonant.js Nested Objects Demo</title>
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css"
+    />
+    <script src="../resonant.js"></script>
+    <style>
+        section.grid {
+            padding: 1rem;
+            margin-bottom: 2rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+<main class="container">
+    <h1>Nested Objects Demo - Houses</h1>
+
+    <section class="grid">
+        <h2>Houses</h2>
+        <ul>
+            <li res="houses">
+                <h3>
+                    <input type="text" res-prop="name" />
+                </h3>
+                <div>
+                    <strong>People</strong>
+                    <ul>
+                        <li res-prop="people">
+                            <input type="text" res-prop="name" placeholder="Name" />
+                            <div res-prop="contact">
+                                <input type="text" res-prop="email" placeholder="Email" />
+                                <input type="text" res-prop="phone" placeholder="Phone" />
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Add Person</h4>
+                    <div res-prop="newPerson">
+                        <input type="text" res-prop="name" placeholder="Name" />
+                        <div res-prop="contact">
+                            <input type="text" res-prop="email" placeholder="Email" />
+                            <input type="text" res-prop="phone" placeholder="Phone" />
+                        </div>
+                    </div>
+                    <button res-onclick="addPerson">Add Person</button>
+                </div>
+                <hr />
+            </li>
+        </ul>
+    </section>
+
+    <section class="grid">
+        <h2>Add House</h2>
+        <input type="text" placeholder="House Name" res="newHouseName" />
+        <button onclick="addHouse()">Add House</button>
+    </section>
+</main>
+
+<script>
+    const resonantJs = new Resonant();
+    resonantJs.addAll({
+        houses: [
+            {
+                name: 'Blue House',
+                people: [
+                    {
+                        name: 'John Doe',
+                        contact: { email: 'john@example.com', phone: '123-456-7890' }
+                    },
+                    {
+                        name: 'Jane Doe',
+                        contact: { email: 'jane@example.com', phone: '222-555-1234' }
+                    }
+                ],
+                newPerson: { name: '', contact: { email: '', phone: '' } }
+            }
+        ],
+        newHouseName: ''
+    });
+
+    function addHouse() {
+        if (!newHouseName.trim()) return;
+        houses.push({
+            name: newHouseName,
+            people: [],
+            newPerson: { name: '', contact: { email: '', phone: '' } }
+        });
+        newHouseName = '';
+    }
+
+    function addPerson(house) {
+        const np = house.newPerson;
+        if (!np.name.trim()) return;
+        house.people.push({
+            name: np.name,
+            contact: { email: np.contact.email, phone: np.contact.phone }
+        });
+        house.newPerson = { name: '', contact: { email: '', phone: '' } };
+    }
+</script>
+</body>
+</html>
