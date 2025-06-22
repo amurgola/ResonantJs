@@ -352,7 +352,7 @@ test('html complexArrayWithChildrenUpdate updates nested data', async () => {
     assert.strictEqual(context.complexArrayWithChildrenUpdate[0].phoneNumbers.length, 3);
     assert.strictEqual(context.complexArrayWithChildrenUpdate[1].phoneNumbers.length, 3);
 
-    // Check that count of phone numbers is now 3
+    // Check that count of phone numbers is now six
     const updatedPhones = Array.from(firstItem.querySelectorAll('li[res-prop="phoneNumbers"][res-rendered="true"]'));
     assert.strictEqual(updatedPhones.length, 6);
 
