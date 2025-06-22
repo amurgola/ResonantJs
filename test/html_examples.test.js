@@ -138,6 +138,8 @@ test('html simpleArrayUpdate modifies existing items', async () => {
   assert.deepStrictEqual(getNames(), ['Josh Forger', 'Matilda Swinson']);
   assert.strictEqual(before.style.display, 'none');
   assert.strictEqual(after.style.display, 'inherit');
+
+  assert.strictEqual(ul.querySelectorAll('li[res-rendered="true"]').length, 2);
 });
 
 // Simple Array Add Test
@@ -329,6 +331,26 @@ test('html complexArrayWithChildrenUpdate updates nested data', async () => {
   assert.strictEqual(addresses[1].querySelector('[res-prop="state"]').innerHTML, 'OH');
   assert.strictEqual(before.style.display, 'none');
   assert.strictEqual(after.style.display, 'inherit');
+
+  // Add a new address to an array
+    context.complexArrayWithChildrenUpdate[0].addresses.push({ city: 'Los Angeles', state: 'CA' });
+    await new Promise(r => setTimeout(r, 5));
+    //Check that count of addresses is now 3
+    const updatedAddresses = Array.from(firstItem.querySelectorAll('li[res-prop="addresses"][res-rendered="true"]'));
+    assert.strictEqual(updatedAddresses.length, 6);
+
+    //Check same number of people
+    const people = root.querySelectorAll('div[res="complexArrayWithChildrenUpdate"][res-rendered="true"]');
+    assert.strictEqual(people.length, 2);
+
+    // Add a new phone number to an array
+    context.complexArrayWithChildrenUpdate[0].phoneNumbers.push('555-111-2222');
+    await new Promise(r => setTimeout(r, 5));
+    // Check that count of phone numbers is now 3
+    const updatedPhones = Array.from(firstItem.querySelectorAll('li[res-prop="phoneNumbers"][res-rendered="true"]'));
+    assert.strictEqual(updatedPhones.length, 6);
+    // Check same number of people
+    assert.strictEqual(people.length, 2);
 });
 
 // Complex Array With Children Display Update
