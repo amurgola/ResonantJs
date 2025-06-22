@@ -374,3 +374,94 @@ test('html complexArrayWithChildrenDisplayUpdate toggles display', async () => {
   assert.strictEqual(items[1].querySelector('div[res-display]').style.display, 'inherit');
 });
 
+// Houses Example
+test('html houses example renders nested contact information', async () => {
+  const housesDiv = new MockElement('div');
+  housesDiv.setAttribute('res', 'houses');
+
+  const h3 = new MockElement('h3');
+  h3.setAttribute('res-prop', 'name');
+
+  const peopleDisplay = new MockElement('div');
+  peopleDisplay.setAttribute('res-display', 'people.length > 0');
+
+  const peopleDiv = new MockElement('div');
+  peopleDiv.setAttribute('res-prop', 'people');
+
+  const personName = new MockElement('span');
+  personName.setAttribute('res-prop', 'name');
+
+  const contactDiv = new MockElement('div');
+  contactDiv.setAttribute('res-prop', 'contact');
+
+  const emailSpan = new MockElement('span');
+  emailSpan.setAttribute('res-prop', 'email');
+  const phoneSpan = new MockElement('span');
+  phoneSpan.setAttribute('res-prop', 'phone');
+
+  contactDiv.appendChild(emailSpan);
+  contactDiv.appendChild(phoneSpan);
+
+  peopleDiv.appendChild(personName);
+  peopleDiv.appendChild(contactDiv);
+  peopleDisplay.appendChild(peopleDiv);
+
+  const peopleEmpty = new MockElement('div');
+  peopleEmpty.setAttribute('res-display', 'people.length == 0');
+
+  housesDiv.appendChild(h3);
+  housesDiv.appendChild(peopleDisplay);
+  housesDiv.appendChild(peopleEmpty);
+
+  const root = new MockElement('div');
+  root.appendChild(housesDiv);
+
+  const { context, resonant } = createResonantDom(root);
+  resonant.add('houses', [
+    {
+      name: 'Blue House',
+      people: [
+        {
+          name: 'John Doe',
+          contact: [
+            { email: 'john@example.com', phone: '123-456-7890' },
+            { email: 'john@asdasdas.com', phone: '123-sss456-7890' }
+          ]
+        },
+        {
+          name: 'Jane Doe',
+          contact: [ { email: 'jane@example.com', phone: '222-555-1234' } ]
+        }
+      ],
+      newPerson: { name: '', contact: { email: '', phone: '' } }
+    }
+  ]);
+
+  const houses = root.querySelectorAll('div[res="houses"][res-rendered="true"]');
+  assert.strictEqual(houses.length, 1);
+
+  const house = houses[0];
+  assert.strictEqual(house.querySelector('[res-prop="name"]').innerHTML, 'Blue House');
+
+  const peopleElems = house.querySelectorAll('div[res-prop="people"][res-rendered="true"]');
+  assert.strictEqual(peopleElems.length, 2);
+  const peopleNames = Array.from(peopleElems).map(p => p.querySelector('span[res-prop="name"]').innerHTML);
+  assert.deepStrictEqual(peopleNames, ['John Doe', 'Jane Doe']);
+
+  const contactElems = house.querySelectorAll('div[res-prop="contact"][res-rendered="true"]');
+  const contacts = Array.from(contactElems).map(c => {
+    const email = c.querySelector('span[res-prop="email"]').innerHTML;
+    const phone = c.querySelector('span[res-prop="phone"]').innerHTML;
+    return `${email} ${phone}`;
+  });
+  assert.deepStrictEqual(contacts, [
+    'john@example.com 123-456-7890',
+    'john@asdasdas.com 123-sss456-7890',
+    'jane@example.com 222-555-1234'
+  ]);
+
+  const displayEls = house.querySelectorAll('[res-display]');
+  assert.strictEqual(displayEls[0].style.display, 'inherit');
+  assert.strictEqual(displayEls[1].style.display, 'none');
+});
+

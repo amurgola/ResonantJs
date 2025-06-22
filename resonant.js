@@ -472,7 +472,15 @@ class Resonant {
             });
         }
         else if (Array.isArray(propValue)) {
-            let parentKey = this.data[parentVarName].key;
+            let parentKey = null;
+            if (parentVarName && this.data[parentVarName]) {
+                parentKey = this.data[parentVarName].key;
+            } else {
+                const childAttr = subEl.getAttribute('res-child');
+                if (childAttr && childAttr.includes('--')) {
+                    parentKey = childAttr.split('--')[1];
+                }
+            }
             this._renderNestedArray(subEl, propValue, parentKey);
         }
         else if (typeof propValue === 'object' && propValue !== null) {
