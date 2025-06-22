@@ -346,9 +346,16 @@ test('html complexArrayWithChildrenUpdate updates nested data', async () => {
     // Add a new phone number to an array
     context.complexArrayWithChildrenUpdate[0].phoneNumbers.push('555-111-2222');
     await new Promise(r => setTimeout(r, 5));
+
+
+    // Make sure both phone numbers are equal to three
+    assert.strictEqual(context.complexArrayWithChildrenUpdate[0].phoneNumbers.length, 3);
+    assert.strictEqual(context.complexArrayWithChildrenUpdate[1].phoneNumbers.length, 3);
+
     // Check that count of phone numbers is now 3
     const updatedPhones = Array.from(firstItem.querySelectorAll('li[res-prop="phoneNumbers"][res-rendered="true"]'));
     assert.strictEqual(updatedPhones.length, 6);
+
     // Check same number of people
     assert.strictEqual(people.length, 2);
 });
