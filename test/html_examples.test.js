@@ -335,8 +335,8 @@ test('html complexArrayWithChildrenUpdate updates nested data', async () => {
   // Add a new address to an array
     context.complexArrayWithChildrenUpdate[0].addresses.push({ city: 'Los Angeles', state: 'CA' });
     await new Promise(r => setTimeout(r, 5));
-    //Check that count of addresses is now 3
-    const updatedAddresses = Array.from(firstItem.querySelectorAll('li[res-prop="addresses"][res-rendered="true"]'));
+    //Check that total count of addresses is now six
+    const updatedAddresses = Array.from(root.querySelectorAll('li[res-prop="addresses"][res-rendered="true"]'));
     assert.strictEqual(updatedAddresses.length, 6);
 
     //Check same number of people
@@ -346,9 +346,16 @@ test('html complexArrayWithChildrenUpdate updates nested data', async () => {
     // Add a new phone number to an array
     context.complexArrayWithChildrenUpdate[0].phoneNumbers.push('555-111-2222');
     await new Promise(r => setTimeout(r, 5));
-    // Check that count of phone numbers is now 3
-    const updatedPhones = Array.from(firstItem.querySelectorAll('li[res-prop="phoneNumbers"][res-rendered="true"]'));
+
+
+    // Make sure both phone numbers are equal to three
+    assert.strictEqual(context.complexArrayWithChildrenUpdate[0].phoneNumbers.length, 3);
+    assert.strictEqual(context.complexArrayWithChildrenUpdate[1].phoneNumbers.length, 3);
+
+    // Check that total count of phone numbers is now six
+    const updatedPhones = Array.from(root.querySelectorAll('li[res-prop="phoneNumbers"][res-rendered="true"]'));
     assert.strictEqual(updatedPhones.length, 6);
+
     // Check same number of people
     assert.strictEqual(people.length, 2);
 });
