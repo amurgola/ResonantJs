@@ -585,10 +585,15 @@ class Resonant {
         });
     }
     _renderNestedArray(subEl, arrayValue, parentKey) {
-        const template = subEl.cloneNode(true);
-        subEl.innerHTML = '';
+        if (!subEl.__res_template) {
+            subEl.__res_template = subEl.cloneNode(true);
+        }
 
-        subEl.removeAttribute('res-prop');
+        const template = subEl.__res_template;
+        subEl.innerHTML = '';
+        while (subEl.children && subEl.children.length) {
+            subEl.children[0].remove();
+        }
 
         arrayValue.forEach((item, idx) => {
             const cloned = template.cloneNode(true);
