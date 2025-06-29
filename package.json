@@ -16,5 +16,8 @@
   "scripts": {
     "test": "node --test",
     "build": "node scripts/build.js"
+  },
+  "devDependencies": {
+    "terser": "^5.34.1"
   }
 }
