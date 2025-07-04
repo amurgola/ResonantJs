@@ -5,7 +5,35 @@ class MockElement {
     this.attributes = {};
     this.style = {};
     this.parentElement = null;
-    this.innerHTML = '';
+    this._innerHTML = '';
+    this._renderCount = 0;
+    this._lastRenderTime = 0;
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  set innerHTML(value) {
+    const stringValue = value == null ? '' : String(value);
+    if (this._innerHTML !== stringValue) {
+      this._innerHTML = stringValue;
+      this._renderCount++;
+      this._lastRenderTime = Date.now();
+    }
+  }
+
+  resetRenderTracking() {
+    this._renderCount = 0;
+    this._lastRenderTime = 0;
+  }
+
+  getRenderCount() {
+    return this._renderCount;
+  }
+
+  getLastRenderTime() {
+    return this._lastRenderTime;
   }
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return this.attributes[name]; }
@@ -19,6 +47,7 @@ class MockElement {
     for (const [k,v] of Object.entries(this.attributes)) clone.attributes[k] = v;
     for (const [k,v] of Object.entries(this.style)) clone.style[k] = v;
     if (deep) this.children.forEach(ch => clone.appendChild(ch.cloneNode(true)));
+    clone.resetRenderTracking(); // Reset tracking for cloned elements
     return clone;
   }
   querySelectorAll(selector) { return querySelectorAllInternal(this, selector); }
