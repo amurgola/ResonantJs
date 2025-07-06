@@ -4,6 +4,12 @@ class MockElement {
     this.children = [];
     this.attributes = {};
     this.style = {};
+    this.classList = {
+      _set: new Set(),
+      add: cls => { this.classList._set.add(cls); },
+      remove: cls => { this.classList._set.delete(cls); },
+      contains: cls => this.classList._set.has(cls)
+    };
     this.parentElement = null;
     this._innerHTML = '';
     this._renderCount = 0;
@@ -46,6 +52,7 @@ class MockElement {
     clone.innerHTML = this.innerHTML;
     for (const [k,v] of Object.entries(this.attributes)) clone.attributes[k] = v;
     for (const [k,v] of Object.entries(this.style)) clone.style[k] = v;
+    for (const cls of this.classList._set) clone.classList.add(cls);
     if (deep) this.children.forEach(ch => clone.appendChild(ch.cloneNode(true)));
     clone.resetRenderTracking(); // Reset tracking for cloned elements
     return clone;
@@ -61,6 +68,13 @@ class MockDocument {
 
 function querySelectorAllInternal(root, selector) {
   selector = selector.trim();
+  if (selector.includes(',')) {
+    let results = [];
+    selector.split(',').forEach(part => {
+      results = results.concat(querySelectorAllInternal(root, part.trim()));
+    });
+    return results;
+  }
   if (selector.includes(' ')) {
     const [first, rest] = selector.split(/\s+/, 2);
     let res = [];
