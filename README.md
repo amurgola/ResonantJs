@@ -116,7 +116,25 @@ Bind click events with context:
 <button res-onclick-remove="true">Delete Item</button>
 ```
 
-### 7. **Input Binding**
+### 7. **Computed Properties**
+Create reactive derived values that automatically update:
+
+```javascript
+const resonant = new Resonant();
+resonant.add('firstName', 'John');
+resonant.add('lastName', 'Doe');
+
+// Computed property automatically updates when dependencies change
+resonant.computed('fullName', () => {
+  return firstName + ' ' + lastName;
+});
+```
+
+```html
+<span res="fullName"></span> <!-- Automatically shows "John Doe" -->
+```
+
+### 8. **Input Binding**
 Two-way data binding for form elements:
 
 ```html
@@ -179,6 +197,27 @@ resonant.add('appState', { currentView: 'dashboard' }, true);
 
 // Changes are automatically saved
 userPreferences.theme = 'light'; // Saved to localStorage
+```
+
+### **Computed Properties**
+Reactive derived values that automatically recalculate:
+
+```javascript
+resonant.add('firstName', 'John');
+resonant.add('lastName', 'Doe');
+
+// Automatically updates when firstName or lastName changes
+resonant.computed('fullName', () => {
+  return firstName + ' ' + lastName;
+});
+
+// Cannot be set directly - read-only
+// fullName = 'Something'; // Will log warning and be ignored
+
+// Chain computed properties
+resonant.computed('greeting', () => {
+  return 'Hello, ' + fullName + '!';
+});
 ```
 
 ### **Advanced Array Operations**
@@ -324,16 +363,54 @@ company.departments[0].teams[0].members.push(newMember);
 ```
 
 ### **Computed Properties**
-Create reactive calculated values:
+Create reactive calculated values that automatically update when dependencies change:
 
 ```javascript
-resonant.addCallback('tasks', () => {
-  stats.totalTasks = tasks.length;
-  stats.completedTasks = tasks.filter(t => t.completed).length;
-  stats.completionRate = stats.totalTasks > 0 
-    ? Math.round((stats.completedTasks / stats.totalTasks) * 100) 
-    : 0;
+const resonant = new Resonant();
+resonant.add('tasks', [
+  { title: 'Task 1', completed: true },
+  { title: 'Task 2', completed: false },
+  { title: 'Task 3', completed: true }
+]);
+
+// Computed properties automatically recalculate when 'tasks' changes
+resonant.computed('totalTasks', () => {
+  return tasks.length;
 });
+
+resonant.computed('completedTasks', () => {
+  return tasks.filter(t => t.completed).length;
+});
+
+resonant.computed('completionRate', () => {
+  return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+});
+
+// Shopping cart example
+resonant.add('items', [
+  { name: 'Widget', price: 10, quantity: 2 },
+  { name: 'Gadget', price: 15, quantity: 1 }
+]);
+resonant.add('taxRate', 0.08);
+
+resonant.computed('subtotal', () => {
+  return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+});
+
+resonant.computed('tax', () => {
+  return subtotal * taxRate;
+});
+
+resonant.computed('total', () => {
+  return subtotal + tax;
+});
+```
+
+```html
+<!-- These automatically update when items change -->
+<div>Subtotal: $<span res="subtotal"></span></div>
+<div>Tax: $<span res="tax"></span></div>
+<div>Total: $<span res="total"></span></div>
 ```
 
 ### **Component-Like Patterns**

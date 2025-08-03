@@ -62,8 +62,17 @@ class MockElement {
 }
 
 class MockDocument {
-  constructor(root) { this.root = root; }
-  querySelectorAll(selector) { return querySelectorAllInternal(this.root, selector); }
+  constructor() { 
+    this.body = new MockElement('body');
+    this.root = this.body;
+  }
+  querySelectorAll(selector) { 
+    if (!this.root) return [];
+    return querySelectorAllInternal(this.root, selector); 
+  }
+  createElement(tagName) {
+    return new MockElement(tagName);
+  }
 }
 
 function querySelectorAllInternal(root, selector) {
@@ -112,9 +121,60 @@ function querySelectorAllInternal(root, selector) {
       }
       if (ok) out.push(node);
     }
-    node.children.forEach(ch => traverse(ch));
+    if (node && node.children) {
+      node.children.forEach(ch => traverse(ch));
+    }
   })(root);
   return out;
 }
 
-module.exports = { MockElement, MockDocument };
+function createResonant() {
+  const fs = require('fs');
+  const vm = require('vm');
+  const path = require('path');
+  
+  const code = fs.readFileSync(path.join(__dirname, '..', 'resonant.js'), 'utf8');
+  const document = new MockDocument();
+  const context = { 
+    console, 
+    setTimeout, 
+    clearTimeout, 
+    document,
+    window: null
+  };
+  context.window = context;
+
+  const store = {};
+  context.localStorage = {
+    getItem: key => (key in store ? store[key] : null),
+    setItem: (key, val) => { store[key] = val; },
+    removeItem: key => { delete store[key]; }
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+  const Resonant = vm.runInContext('Resonant', context);
+  const resonant = new Resonant();
+  
+  // Add resonant to context so it can be accessed in computed functions
+  context.resonant = resonant;
+  
+  return { 
+    context, 
+    resonant, 
+    store,
+    document,
+    cleanup: () => {
+      // Clear all global variables
+      Object.keys(context).forEach(key => {
+        if (key !== 'console' && key !== 'setTimeout' && key !== 'clearTimeout' && 
+            key !== 'document' && key !== 'window' && key !== 'localStorage' && 
+            key !== 'resonant') {
+          delete context[key];
+        }
+      });
+    }
+  };
+}
+
+module.exports = { MockElement, MockDocument, createResonant };
