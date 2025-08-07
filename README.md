@@ -59,6 +59,75 @@ That's it! Your counter will automatically update the DOM and persist to localSt
 
 ---
 
+## ⏱️ Build a Todo in 5 minutes
+
+Copy‑paste the snippet below into an `.html` file and open it in your browser.
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>ResonantJs • 5‑min Todo</title>
+    <style>
+      .completed { text-decoration: line-through; color: #888; }
+    </style>
+    <script src="https://unpkg.com/resonantjs@latest/resonant.js"></script>
+  </head>
+  <body>
+    <h1>Todos (<span res="tasks.length"></span>)</h1>
+
+    <input placeholder="Add a task..." res="newTask" />
+    <button onclick="addTask()">Add</button>
+
+    <ul>
+      <li res="tasks" res-display="newTask === '' || name.toLowerCase().includes(newTask.toLowerCase())">
+        <input type="checkbox" res-prop="completed" />
+        <span res-prop="name" res-style="completed ? 'completed' : ''"></span>
+        <button res-onclick="removeTask">Remove</button>
+      </li>
+    </ul>
+
+    <script>
+      const resonant = new Resonant();
+      resonant.addAll({
+        newTask: '',
+        tasks: [
+          { name: 'Learn ResonantJs', completed: false },
+          { name: 'Ship a feature', completed: true }
+        ]
+      });
+
+      function addTask() {
+        const title = newTask.trim();
+        if (!title) return;
+        tasks.unshift({ name: title, completed: false });
+        newTask = '';
+      }
+
+      function removeTask(item) {
+        const idx = tasks.indexOf(item);
+        if (idx !== -1) tasks.delete(idx);
+      }
+
+      // Optional: observe changes
+      resonant.addCallback('tasks', (list, item, action) => {
+        console.log('[tasks]', action, item);
+      });
+    </script>
+  </body>
+  </html>
+```
+
+Key takeaways:
+- Use `res="tasks"` on a template element inside a list container to auto‑render each item.
+- Use `res-prop` inside that template to bind fields of the current item.
+- Use `res-display` for inline filtering/conditional rendering; inside lists, bare props like `completed` refer to the current item.
+- `res-style` returns a space‑separated class string.
+- Event handlers referenced by `res-onclick` are global functions and receive `item` when declared with a parameter.
+
+---
+
 ## 📖 Core Concepts
 
 ### 1. **Data Binding** (`res`)
@@ -148,6 +217,51 @@ Two-way data binding for form elements:
 
 ---
 
+## 🧭 Best Practices and Tips
+
+- Name your state clearly: variables you `add` become globals on `window` (e.g., `tasks`, `user`). Avoid collisions with existing globals.
+- In list templates (`res="items"`), you can reference current item fields directly (`completed`, `name`) or as `item.completed` — both work.
+- Prefer `items.set(i, value)` over direct index assignment for clarity; both are reactive.
+- When replacing a whole list, use `items.update(newArray)` to emit a single coherent update.
+- Use `res-prop=""` to bind an entire object to a single element when you just want to print it.
+- `res-onclick` handlers are looked up on `window`. If your handler accepts an argument, Resonant passes the current `item`.
+- For quick removal buttons, use `res-onclick-remove="idProp"` to delete by a unique key on each item.
+- Computed properties track dependencies automatically. Use plain variable names inside the function (e.g., `firstName`, `lastName`). They are read‑only.
+- Conditional display and styles evaluate JavaScript expressions. Keep them simple and fast.
+
+Pro performance notes:
+- Resonant selectively re-renders only changed array items by tracking indices and stable object keys.
+- Deeply nested objects and arrays are proxied; nested edits still update only affected DOM segments.
+
+---
+
+## 📌 API & Attribute Cheat Sheet
+
+HTML attributes:
+- `res` — bind a variable or array/template root
+- `res-prop` — bind an object property within a `res` context; empty value binds the whole item
+- `res-display` — boolean expression to show/hide element
+- `res-style` — expression returning a space‑separated class string
+- `res-onclick` — call a global function; if it declares a parameter, it receives the current item
+- `res-onclick-remove` — remove from the parent array by matching the given property (e.g., `id`)
+
+JS API:
+- `const resonant = new Resonant()`
+- `resonant.add(name, value, persist?)`
+- `resonant.addAll(objectMap)`
+- `resonant.addCallback(name, (newValue, item, action) => void)`
+- `resonant.computed(name, () => value)`
+
+Array helpers on reactive arrays:
+- `.push`, `.pop`, `.shift`, `.unshift`, `.splice`, `.sort`, `.reverse`
+- `.set(index, value)`, `.delete(index)`, `.update(array)`, `.filter(fn)`, `.filterInPlace(fn)`, `.forceUpdate()`
+
+Callback `action` values:
+- Scalars: `modified`
+- Arrays: `added`, `removed`, `modified`, `updated`, `filtered`
+
+---
+
 ## 🎯 Key Features
 
 ### **Reactive Data Management**
@@ -230,6 +344,9 @@ items.splice(index, 1);        // Remove item
 items.update([...newItems]);   // Replace entire array
 items.set(index, newValue);    // Update specific index
 items.delete(index);           // Delete by index
+items.filter(v => v > 0);      // Non-mutating; still triggers a 'filtered' callback
+items.filterInPlace(fn);       // Mutating filter + rerender
+items.forceUpdate();           // Force a rerender without changing contents
 ```
 
 ---
@@ -445,7 +562,7 @@ Explore our comprehensive examples:
 - **[Basic Counter](./examples/example-basic.html)** - Simple reactive counter
 - **[Task Manager](./examples/example-taskmanager.html)** - Complete task management app
 - **[Houses Demo](./examples/example-houses.html)** - Complex nested data structures
-- **[Advanced Demo](./examples/example-taskmanager-simple-demo.html)** - Full-featured application
+- **[Tests Showcase](./examples/tests.html)** - Interactive testbed used in CI
 
 Each example demonstrates different aspects of ResonantJs and can serve as starting points for your projects.
 
