@@ -4,8 +4,42 @@ class MockElement {
     this.children = [];
     this.attributes = {};
     this.style = {};
+    this.classList = {
+      _set: new Set(),
+      add: cls => { this.classList._set.add(cls); },
+      remove: cls => { this.classList._set.delete(cls); },
+      contains: cls => this.classList._set.has(cls)
+    };
     this.parentElement = null;
-    this.innerHTML = '';
+    this._innerHTML = '';
+    this._renderCount = 0;
+    this._lastRenderTime = 0;
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  set innerHTML(value) {
+    const stringValue = value == null ? '' : String(value);
+    if (this._innerHTML !== stringValue) {
+      this._innerHTML = stringValue;
+      this._renderCount++;
+      this._lastRenderTime = Date.now();
+    }
+  }
+
+  resetRenderTracking() {
+    this._renderCount = 0;
+    this._lastRenderTime = 0;
+  }
+
+  getRenderCount() {
+    return this._renderCount;
+  }
+
+  getLastRenderTime() {
+    return this._lastRenderTime;
   }
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return this.attributes[name]; }
@@ -18,7 +52,9 @@ class MockElement {
     clone.innerHTML = this.innerHTML;
     for (const [k,v] of Object.entries(this.attributes)) clone.attributes[k] = v;
     for (const [k,v] of Object.entries(this.style)) clone.style[k] = v;
+    for (const cls of this.classList._set) clone.classList.add(cls);
     if (deep) this.children.forEach(ch => clone.appendChild(ch.cloneNode(true)));
+    clone.resetRenderTracking(); // Reset tracking for cloned elements
     return clone;
   }
   querySelectorAll(selector) { return querySelectorAllInternal(this, selector); }
@@ -26,12 +62,28 @@ class MockElement {
 }
 
 class MockDocument {
-  constructor(root) { this.root = root; }
-  querySelectorAll(selector) { return querySelectorAllInternal(this.root, selector); }
+  constructor() { 
+    this.body = new MockElement('body');
+    this.root = this.body;
+  }
+  querySelectorAll(selector) { 
+    if (!this.root) return [];
+    return querySelectorAllInternal(this.root, selector); 
+  }
+  createElement(tagName) {
+    return new MockElement(tagName);
+  }
 }
 
 function querySelectorAllInternal(root, selector) {
   selector = selector.trim();
+  if (selector.includes(',')) {
+    let results = [];
+    selector.split(',').forEach(part => {
+      results = results.concat(querySelectorAllInternal(root, part.trim()));
+    });
+    return results;
+  }
   if (selector.includes(' ')) {
     const [first, rest] = selector.split(/\s+/, 2);
     let res = [];
@@ -69,9 +121,60 @@ function querySelectorAllInternal(root, selector) {
       }
       if (ok) out.push(node);
     }
-    node.children.forEach(ch => traverse(ch));
+    if (node && node.children) {
+      node.children.forEach(ch => traverse(ch));
+    }
   })(root);
   return out;
 }
 
-module.exports = { MockElement, MockDocument };
+function createResonant() {
+  const fs = require('fs');
+  const vm = require('vm');
+  const path = require('path');
+  
+  const code = fs.readFileSync(path.join(__dirname, '..', 'resonant.js'), 'utf8');
+  const document = new MockDocument();
+  const context = { 
+    console, 
+    setTimeout, 
+    clearTimeout, 
+    document,
+    window: null
+  };
+  context.window = context;
+
+  const store = {};
+  context.localStorage = {
+    getItem: key => (key in store ? store[key] : null),
+    setItem: (key, val) => { store[key] = val; },
+    removeItem: key => { delete store[key]; }
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+  const Resonant = vm.runInContext('Resonant', context);
+  const resonant = new Resonant();
+  
+  // Add resonant to context so it can be accessed in computed functions
+  context.resonant = resonant;
+  
+  return { 
+    context, 
+    resonant, 
+    store,
+    document,
+    cleanup: () => {
+      // Clear all global variables
+      Object.keys(context).forEach(key => {
+        if (key !== 'console' && key !== 'setTimeout' && key !== 'clearTimeout' && 
+            key !== 'document' && key !== 'window' && key !== 'localStorage' && 
+            key !== 'resonant') {
+          delete context[key];
+        }
+      });
+    }
+  };
+}
+
+module.exports = { MockElement, MockDocument, createResonant };

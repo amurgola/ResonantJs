@@ -98,6 +98,48 @@
         </code>
     </section>
 
+    <!-- Demonstrate computed properties -->
+    <section class="grid">
+        <div>
+            <h2>Computed Properties</h2>
+            <p>Full Name: <strong res="fullName"></strong></p>
+            <p>Greeting: <em res="greeting"></em></p>
+            <p>Initials: <span res="initials"></span></p>
+            <div res-display="fullName.length > 10" class="conditional">
+                Full name is longer than 10 characters
+            </div>
+        </div>
+        <div>
+            <p style="color: #666; font-size: 0.9em;">
+                These values automatically update when you change the first or last name above. 
+                Computed properties cannot be edited directly.
+            </p>
+        </div>
+    </section>
+
+    <section class="grid">
+        <code class="code">
+            // Computed properties automatically update<br/>
+            resonantJs.computed('fullName', () => {<br/>
+            &nbsp;&nbsp;return user.firstname + ' ' + user.lastname;<br/>
+            });<br/><br/>
+            
+            resonantJs.computed('greeting', () => {<br/>
+            &nbsp;&nbsp;return 'Hello, ' + fullName + '!';<br/>
+            });<br/><br/>
+            
+            resonantJs.computed('initials', () => {<br/>
+            &nbsp;&nbsp;return (user.firstname[0] || '') + (user.lastname[0] || '');<br/>
+            });
+        </code>
+        <code class="code">
+            &lt;p&gt;Full Name: &lt;strong res="fullName"&gt;&lt;/strong&gt;&lt;/p&gt;<br/>
+            &lt;p&gt;Greeting: &lt;em res="greeting"&gt;&lt;/em&gt;&lt;/p&gt;<br/>
+            &lt;p&gt;Initials: &lt;span res="initials"&gt;&lt;/span&gt;&lt;/p&gt;<br/>
+            &lt;div res-display="fullName.length &gt; 10"&gt;...&lt;/div&gt;
+        </code>
+    </section>
+
     <!-- Demonstrate dynamic list rendering -->
     <section class="grid">
         <div>
@@ -185,6 +227,10 @@
                 <td>resonantJs.addCallback("variableName", (objectReturned) => {})</td>
                 <td>Bind a callback function to a variable</td>
             </tr>
+            <tr>
+                <td>resonantJs.computed("computedName", () => { return expression; })</td>
+                <td>Create a computed property that automatically updates when dependencies change</td>
+            </tr>
         </table>
     </section>
 </main>
@@ -207,7 +253,18 @@
         ]
     });
 
+    // Define computed properties that automatically update
+    resonantJs.computed('fullName', () => {
+        return user.firstname + ' ' + user.lastname;
+    });
 
+    resonantJs.computed('greeting', () => {
+        return 'Hello, ' + fullName + '!';
+    });
+
+    resonantJs.computed('initials', () => {
+        return (user.firstname[0] || '') + (user.lastname[0] || '');
+    });
 
     // Chain together callbacks
     resonantJs.addCallback("user", (user) => {

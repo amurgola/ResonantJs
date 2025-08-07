@@ -193,6 +193,8 @@ class Resonant {
         this.callbacks = {};
         this.pendingUpdates = new Map();
         this.arrayDataChangeDetection = {};
+        this.computedProperties = {};
+        this.computedDependencies = {};
     }
 
     _handleInputElement(element, value, onChangeCallback) {
@@ -249,6 +251,54 @@ class Resonant {
         Object.entries(config).forEach(([variableName, value]) => {
             this.add(variableName, value);
         });
+    }
+
+    computed(computedName, computeFunction) {
+        this.computedProperties[computedName] = computeFunction;
+        this.computedDependencies[computedName] = new Set();
+        
+        // Clear previous dependencies
+        this.computedDependencies[computedName].clear();
+        this._currentComputed = computedName;
+        
+        try {
+            // Execute computation to capture dependencies and get initial value
+            const result = computeFunction();
+            this.data[computedName] = result;
+            this._defineProperty(computedName);
+            this.updateElement(computedName);
+        } finally {
+            this._currentComputed = null;
+        }
+    }
+
+    _captureAccess(property) {
+        if (this._currentComputed && this.data.hasOwnProperty(property)) {
+            this.computedDependencies[this._currentComputed].add(property);
+        }
+    }
+
+    _recomputeProperty(computedName) {
+        if (this.computedProperties[computedName]) {
+            const computeFunction = this.computedProperties[computedName];
+            const oldValue = this.data[computedName];
+            
+            // Clear and recapture dependencies
+            this.computedDependencies[computedName].clear();
+            this._currentComputed = computedName;
+            
+            try {
+                const newValue = computeFunction();
+                
+                if (oldValue !== newValue) {
+                    this.data[computedName] = newValue;
+                    this.updateElement(computedName);
+                    this._queueUpdate(computedName, 'modified', newValue, null, oldValue);
+                }
+            } finally {
+                this._currentComputed = null;
+            }
+        }
     }
 
     _resolveValue(instance, key, override = null) {
@@ -372,8 +422,18 @@ class Resonant {
 
     _defineProperty(variableName) {
         Object.defineProperty(window, variableName, {
-            get: () => this.data[variableName],
+            get: () => {
+                if (this._currentComputed) {
+                    this._captureAccess(variableName);
+                }
+                return this.data[variableName];
+            },
             set: (newValue) => {
+                if (this.computedProperties[variableName]) {
+                    console.warn(`Cannot set computed property "${variableName}"`);
+                    return;
+                }
+                
                 if (Array.isArray(newValue)) {
                     this.data[variableName] = new ObservableArray(variableName, this, ...newValue);
                     this.arrayDataChangeDetection[variableName] = this.data[variableName].slice();
@@ -416,6 +476,13 @@ class Resonant {
                 this.updateElement(variableName);
                 this.updateDisplayConditionalsFor(variableName);
                 this.updateStylesFor(variableName);
+                
+                // Recompute dependent computed properties
+                Object.keys(this.computedDependencies).forEach(computedName => {
+                    if (this.computedDependencies[computedName].has(variableName)) {
+                        this._recomputeProperty(computedName);
+                    }
+                });
             }, 0);
         }
     }
