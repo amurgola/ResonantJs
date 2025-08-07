@@ -45,7 +45,16 @@ class MockElement {
   getAttribute(name) { return this.attributes[name]; }
   hasAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name); }
   removeAttribute(name) { delete this.attributes[name]; }
-  appendChild(child) { child.parentElement = this; this.children.push(child); }
+  appendChild(child) {
+    if (child.parentElement && child.parentElement !== this) {
+      const idx = child.parentElement.children.indexOf(child);
+      if (idx >= 0) {
+        child.parentElement.children.splice(idx, 1);
+      }
+    }
+    child.parentElement = this;
+    this.children.push(child);
+  }
   remove() { if (this.parentElement) { const idx = this.parentElement.children.indexOf(this); if (idx >= 0) this.parentElement.children.splice(idx,1); this.parentElement = null; } }
   cloneNode(deep=true) {
     const clone = new MockElement(this.tagName);
@@ -62,9 +71,9 @@ class MockElement {
 }
 
 class MockDocument {
-  constructor() { 
+  constructor(root) { 
     this.body = new MockElement('body');
-    this.root = this.body;
+    this.root = root || this.body;
   }
   querySelectorAll(selector) { 
     if (!this.root) return [];
