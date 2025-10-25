@@ -1,25 +1,25 @@
-# ResonantJs 🚀
+# ResonantJs
 
 [![npm version](https://badge.fury.io/js/resonantjs.svg)](https://badge.fury.io/js/resonantjs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**ResonantJs** is a lightweight, powerful JavaScript framework that brings **reactive data-binding** to vanilla JavaScript applications. Build dynamic, responsive UIs with minimal code and zero dependencies.
+**ResonantJs** is a lightweight, powerful JavaScript framework that brings reactive data-binding to vanilla JavaScript applications. Build dynamic, responsive UIs with minimal code and zero dependencies.
 
 > **Zero dependencies • ~11.5KB minified • Lightning fast • Easy to learn**
 
-## ✨ Why Choose ResonantJs?
+## Why Choose ResonantJs?
 
-- 🔄 **True Reactivity**: Data changes automatically update the DOM - no manual manipulation needed
-- 🎯 **Attribute-Based**: Use simple HTML attributes to create powerful data bindings
-- 🏗️ **Deep Object Support**: Handles nested objects and arrays with full reactivity
-- 💾 **Built-in Persistence**: Automatic localStorage integration for data persistence
-- 🎨 **Dynamic Styling**: Conditional CSS classes and styles based on your data
-- ⚡ **Performance**: Efficient updates with minimal overhead
-- 📦 **Tiny Footprint**: Under 11.5KB minified - perfect for any project size
+- **True Reactivity**: Data changes automatically update the DOM with no manual manipulation required
+- **Attribute-Based**: Simple HTML attributes create powerful data bindings
+- **Deep Object Support**: Full reactivity for nested objects and arrays
+- **Built-in Persistence**: Automatic localStorage integration for data persistence
+- **Dynamic Styling**: Conditional CSS classes and styles based on your data
+- **Performance**: Efficient updates with minimal overhead
+- **Tiny Footprint**: Under 11.5KB minified, perfect for any project size
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -55,13 +55,13 @@ npm install resonantjs
 </html>
 ```
 
-That's it! Your counter will automatically update the DOM and persist to localStorage.
+That's it. Your counter automatically updates the DOM and persists to localStorage.
 
 ---
 
-## ⏱️ Build a Todo in 5 minutes
+## Build a Todo App in 5 Minutes
 
-Copy‑paste the snippet below into an `.html` file and open it in your browser.
+Copy and paste the snippet below into an `.html` file and open it in your browser.
 
 ```html
 <!doctype html>
@@ -119,18 +119,20 @@ Copy‑paste the snippet below into an `.html` file and open it in your browser.
   </html>
 ```
 
-Key takeaways:
-- Use `res="tasks"` on a template element inside a list container to auto‑render each item.
-- Use `res-prop` inside that template to bind fields of the current item.
-- Use `res-display` for inline filtering/conditional rendering; inside lists, bare props like `completed` refer to the current item.
-- `res-style` returns a space‑separated class string.
-- Event handlers referenced by `res-onclick` are global functions and receive `item` when declared with a parameter.
+### Key Takeaways
+
+- Use `res="tasks"` on a template element inside a list container to auto-render each item
+- Use `res-prop` inside that template to bind fields of the current item
+- Use `res-display` for inline filtering/conditional rendering; inside lists, bare props like `completed` refer to the current item
+- `res-style` returns a space-separated class string
+- Event handlers referenced by `res-onclick` are global functions and receive `item` when declared with a parameter
 
 ---
 
-## 📖 Core Concepts
+## Core Concepts
 
-### 1. **Data Binding** (`res`)
+### Data Binding (`res`)
+
 Bind HTML elements directly to your JavaScript variables:
 
 ```html
@@ -138,7 +140,8 @@ Bind HTML elements directly to your JavaScript variables:
 <div res="user.profile.name"></div> <!-- Nested object property -->
 ```
 
-### 2. **Object Properties** (`res-prop`)
+### Object Properties (`res-prop`)
+
 Bind to specific properties within objects:
 
 ```html
@@ -148,7 +151,8 @@ Bind to specific properties within objects:
 </div>
 ```
 
-### 3. **Array Rendering**
+### Array Rendering
+
 Automatically render arrays with template-based elements:
 
 ```html
@@ -160,8 +164,9 @@ Automatically render arrays with template-based elements:
 </ul>
 ```
 
-### 4. **Conditional Display** (`res-display`)
-Show/hide elements based on conditions:
+### Conditional Display (`res-display`)
+
+Show or hide elements based on conditions:
 
 ```html
 <div res-display="user.isActive">Welcome back!</div>
@@ -169,7 +174,8 @@ Show/hide elements based on conditions:
 <div res-display="user.role === 'admin'">Admin Panel</div>
 ```
 
-### 5. **Dynamic Styling** (`res-style`)
+### Dynamic Styling (`res-style`)
+
 Apply conditional CSS classes and styles:
 
 ```html
@@ -177,7 +183,8 @@ Apply conditional CSS classes and styles:
 <span res-style="'priority-' + task.priority">High Priority</span>
 ```
 
-### 6. **Event Handling** (`res-onclick`)
+### Event Handling (`res-onclick`)
+
 Bind click events with context:
 
 ```html
@@ -185,7 +192,8 @@ Bind click events with context:
 <button res-onclick-remove="true">Delete Item</button>
 ```
 
-### 7. **Computed Properties**
+### Computed Properties
+
 Create reactive derived values that automatically update:
 
 ```javascript
@@ -203,7 +211,8 @@ resonant.computed('fullName', () => {
 <span res="fullName"></span> <!-- Automatically shows "John Doe" -->
 ```
 
-### 8. **Input Binding**
+### Input Binding
+
 Two-way data binding for form elements:
 
 ```html
@@ -217,54 +226,62 @@ Two-way data binding for form elements:
 
 ---
 
-## 🧭 Best Practices and Tips
+## Best Practices and Tips
 
-- Name your state clearly: variables you `add` become globals on `window` (e.g., `tasks`, `user`). Avoid collisions with existing globals.
-- In list templates (`res="items"`), you can reference current item fields directly (`completed`, `name`) or as `item.completed` — both work.
-- Prefer `items.set(i, value)` over direct index assignment for clarity; both are reactive.
-- When replacing a whole list, use `items.update(newArray)` to emit a single coherent update.
-- Use `res-prop=""` to bind an entire object to a single element when you just want to print it.
-- `res-onclick` handlers are looked up on `window`. If your handler accepts an argument, Resonant passes the current `item`.
-- For quick removal buttons, use `res-onclick-remove="idProp"` to delete by a unique key on each item.
-- Computed properties track dependencies automatically. Use plain variable names inside the function (e.g., `firstName`, `lastName`). They are read‑only.
-- Conditional display and styles evaluate JavaScript expressions. Keep them simple and fast.
+- **Name your state clearly**: Variables you `add` become globals on `window` (e.g., `tasks`, `user`). Avoid collisions with existing globals.
+- **List templates**: In `res="items"` templates, you can reference current item fields directly (`completed`, `name`) or as `item.completed` — both work.
+- **Array updates**: Prefer `items.set(i, value)` over direct index assignment for clarity; both are reactive.
+- **Batch updates**: When replacing a whole list, use `items.update(newArray)` to emit a single coherent update.
+- **Object binding**: Use `res-prop=""` to bind an entire object to a single element when you just want to print it.
+- **Event handlers**: `res-onclick` handlers are looked up on `window`. If your handler accepts an argument, Resonant passes the current `item`.
+- **Quick removal**: For quick removal buttons, use `res-onclick-remove="idProp"` to delete by a unique key on each item.
+- **Computed properties**: Track dependencies automatically. Use plain variable names inside the function (e.g., `firstName`, `lastName`). They are read-only.
+- **Conditional expressions**: Keep display and style expressions simple and fast.
 
-Pro performance notes:
-- Resonant selectively re-renders only changed array items by tracking indices and stable object keys.
-- Deeply nested objects and arrays are proxied; nested edits still update only affected DOM segments.
+### Performance Notes
+
+- Resonant selectively re-renders only changed array items by tracking indices and stable object keys
+- Deeply nested objects and arrays are proxied; nested edits still update only affected DOM segments
 
 ---
 
-## 📌 API & Attribute Cheat Sheet
+## API & Attribute Reference
 
-HTML attributes:
+### HTML Attributes
+
 - `res` — bind a variable or array/template root
 - `res-prop` — bind an object property within a `res` context; empty value binds the whole item
 - `res-display` — boolean expression to show/hide element
-- `res-style` — expression returning a space‑separated class string
+- `res-style` — expression returning a space-separated class string
 - `res-onclick` — call a global function; if it declares a parameter, it receives the current item
 - `res-onclick-remove` — remove from the parent array by matching the given property (e.g., `id`)
 
-JS API:
+### JavaScript API
+
 - `const resonant = new Resonant()`
 - `resonant.add(name, value, persist?)`
 - `resonant.addAll(objectMap)`
 - `resonant.addCallback(name, (newValue, item, action) => void)`
 - `resonant.computed(name, () => value)`
 
-Array helpers on reactive arrays:
+### Array Helpers
+
+Reactive arrays include these methods:
+
 - `.push`, `.pop`, `.shift`, `.unshift`, `.splice`, `.sort`, `.reverse`
 - `.set(index, value)`, `.delete(index)`, `.update(array)`, `.filter(fn)`, `.filterInPlace(fn)`, `.forceUpdate()`
 
-Callback `action` values:
+### Callback Actions
+
 - Scalars: `modified`
 - Arrays: `added`, `removed`, `modified`, `updated`, `filtered`
 
 ---
 
-## 🎯 Key Features
+## Key Features
 
-### **Reactive Data Management**
+### Reactive Data Management
+
 ```javascript
 const resonant = new Resonant();
 
@@ -280,11 +297,12 @@ resonant.addAll({
 });
 
 // Changes automatically update the UI
-user.name = 'Jane';           // DOM updates instantly
+user.name = 'Jane'; // DOM updates instantly
 tasks.push({ title: 'New task' }); // Array renders new item
 ```
 
-### **Event Callbacks**
+### Callback System
+
 React to data changes with custom logic:
 
 ```javascript
@@ -301,7 +319,8 @@ resonant.addCallback('user', (newValue, item, action) => {
 });
 ```
 
-### **Persistence**
+### LocalStorage Persistence
+
 Automatic localStorage integration:
 
 ```javascript
@@ -313,7 +332,8 @@ resonant.add('appState', { currentView: 'dashboard' }, true);
 userPreferences.theme = 'light'; // Saved to localStorage
 ```
 
-### **Computed Properties**
+### Computed Properties
+
 Reactive derived values that automatically recalculate:
 
 ```javascript
@@ -334,26 +354,28 @@ resonant.computed('greeting', () => {
 });
 ```
 
-### **Advanced Array Operations**
+### Array Operations
+
 Full array reactivity with custom methods:
 
 ```javascript
 // All operations trigger UI updates
-items.push(newItem);           // Add item
-items.splice(index, 1);        // Remove item  
-items.update([...newItems]);   // Replace entire array
-items.set(index, newValue);    // Update specific index
-items.delete(index);           // Delete by index
-items.filter(v => v > 0);      // Non-mutating; still triggers a 'filtered' callback
-items.filterInPlace(fn);       // Mutating filter + rerender
-items.forceUpdate();           // Force a rerender without changing contents
+items.push(newItem);              // Add item
+items.splice(index, 1);           // Remove item
+items.update([...newItems]);      // Replace entire array
+items.set(index, newValue);       // Update specific index
+items.delete(index);              // Delete by index
+items.filter(v => v > 0);         // Non-mutating; still triggers a 'filtered' callback
+items.filterInPlace(fn);          // Mutating filter + rerender
+items.forceUpdate();              // Force a rerender without changing contents
 ```
 
 ---
 
-## 🏗️ Real-World Examples
+## Real-World Examples
 
 ### Todo List with Filtering
+
 ```html
 <div>
   <input res="newTask" placeholder="Add task..." />
@@ -413,6 +435,7 @@ updateFilter();
 ```
 
 ### Dashboard with Statistics
+
 ```html
 <div class="dashboard">
   <div class="stats">
@@ -451,9 +474,10 @@ updateFilter();
 
 ---
 
-## 📚 Advanced Patterns
+## Advanced Patterns
 
-### **Nested Data Structures**
+### Nested Data Structures
+
 Handle complex, deeply nested data:
 
 ```javascript
@@ -479,7 +503,8 @@ company.departments[0].teams[0].members[0].name = 'Alice Johnson';
 company.departments[0].teams[0].members.push(newMember);
 ```
 
-### **Computed Properties**
+### Computed Properties
+
 Create reactive calculated values that automatically update when dependencies change:
 
 ```javascript
@@ -530,7 +555,8 @@ resonant.computed('total', () => {
 <div>Total: $<span res="total"></span></div>
 ```
 
-### **Component-Like Patterns**
+### Component-Like Patterns
+
 Organize code into reusable patterns:
 
 ```javascript
@@ -555,7 +581,7 @@ function createTaskManager(containerId) {
 
 ---
 
-## 🎨 Examples & Demos
+## Examples & Demos
 
 Explore our comprehensive examples:
 
@@ -568,28 +594,31 @@ Each example demonstrates different aspects of ResonantJs and can serve as start
 
 ---
 
-## 🚀 Performance & Browser Support
+## Performance & Browser Support
 
-### **Performance**
+### Performance
+
 - **Minimal overhead**: Only updates affected DOM elements
 - **Efficient diffing**: Smart change detection for nested objects
 - **Lazy evaluation**: Conditional expressions only run when dependencies change
 - **Memory efficient**: Automatic cleanup of unused observers
 
-### **Browser Support**
-- ✅ Chrome 60+
-- ✅ Firefox 55+
-- ✅ Safari 12+
-- ✅ Edge 79+
-- ✅ Mobile browsers (iOS Safari, Chrome Mobile)
+### Browser Support
+
+- Chrome 60+
+- Firefox 55+
+- Safari 12+
+- Edge 79+
+- Mobile browsers (iOS Safari, Chrome Mobile)
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ### Development Setup
+
 ```bash
 git clone https://github.com/amurgola/ResonantJs.git
 cd ResonantJs
@@ -598,20 +627,21 @@ npm test
 ```
 
 ### Running Tests
+
 ```bash
-npm test                    # Run all tests
-npm test -- test/specific.test.js  # Run specific test file
+npm test                              # Run all tests
+npm test -- test/specific.test.js    # Run specific test file
 ```
 
 ---
 
-## 📄 License
+## License
 
 ResonantJs is released under the **MIT License**. See [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙋‍♂️ Support & Community
+## Support & Community
 
 - **Issues**: [GitHub Issues](https://github.com/amurgola/ResonantJs/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/amurgola/ResonantJs/discussions)
@@ -621,8 +651,8 @@ ResonantJs is released under the **MIT License**. See [LICENSE](LICENSE) file fo
 
 <div align="center">
 
-**[⭐ Star us on GitHub](https://github.com/amurgola/ResonantJs)** • **[🚀 Try the Demo](./examples/example-taskmanager-simple-demo.html)** • **[📖 Read the Docs](https://github.com/amurgola/ResonantJs/wiki)**
+**[Star us on GitHub](https://github.com/amurgola/ResonantJs)** • **[Try the Demo](./examples/example-taskmanager-simple-demo.html)** • **[Read the Docs](https://github.com/amurgola/ResonantJs/wiki)**
 
-*Built with ❤️ by [Andrew Paul Murgola](https://github.com/amurgola)*
+*Built with care by [Andrew Paul Murgola](https://github.com/amurgola)*
 
 </div>
