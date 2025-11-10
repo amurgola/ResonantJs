@@ -5,7 +5,7 @@
 
 **ResonantJs** is a lightweight, powerful JavaScript framework that brings reactive data-binding to vanilla JavaScript applications. Build dynamic, responsive UIs with minimal code and zero dependencies.
 
-> **Zero dependencies • ~11.5KB minified • Lightning fast • Easy to learn**
+> **Zero dependencies • ~17KB minified • Lightning fast • Easy to learn**
 
 ## Why Choose ResonantJs?
 
