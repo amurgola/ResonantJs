@@ -46,7 +46,8 @@ class MockElement {
   hasAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name); }
   removeAttribute(name) { delete this.attributes[name]; }
   appendChild(child) {
-    if (child.parentElement && child.parentElement !== this) {
+    // Remove child from its current parent (even if it's this element)
+    if (child.parentElement) {
       const idx = child.parentElement.children.indexOf(child);
       if (idx >= 0) {
         child.parentElement.children.splice(idx, 1);

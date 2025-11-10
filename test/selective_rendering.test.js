@@ -368,3 +368,143 @@ test('array item property update should not affect other array items', async () 
   // Verify values are correct
   assert.strictEqual(secondItemPrice.innerHTML, '25');
 });
+
+test('manual DOM changes should be preserved when updating unrelated array items', async () => {
+  // Create DOM structure with array of objects
+  const root = new MockElement('ul');
+
+  const li = new MockElement('li');
+  li.setAttribute('res', 'people');
+
+  const nameSpan = new MockElement('span');
+  nameSpan.setAttribute('res-prop', 'name');
+  li.appendChild(nameSpan);
+
+  const ageSpan = new MockElement('span');
+  ageSpan.setAttribute('res-prop', 'age');
+  li.appendChild(ageSpan);
+
+  root.appendChild(li);
+
+  const { context, resonant } = createResonantDom(root);
+
+  // Initialize array with multiple people
+  resonant.add('people', [
+    { name: 'Alice', age: 30 },
+    { name: 'Bob', age: 25 },
+    { name: 'Charlie', age: 35 }
+  ]);
+
+  // Get rendered elements
+  const renderedItems = root.querySelectorAll('[res-rendered="true"]');
+  assert.strictEqual(renderedItems.length, 3, 'Should have 3 rendered items');
+
+  // Verify initial values
+  const firstItemNameSpan = renderedItems[0].querySelector('[res-prop="name"]');
+  const secondItemNameSpan = renderedItems[1].querySelector('[res-prop="name"]');
+  const thirdItemNameSpan = renderedItems[2].querySelector('[res-prop="name"]');
+
+  assert.strictEqual(firstItemNameSpan.innerHTML, 'Alice');
+  assert.strictEqual(secondItemNameSpan.innerHTML, 'Bob');
+  assert.strictEqual(thirdItemNameSpan.innerHTML, 'Charlie');
+
+  // Manually modify the first item's name directly in the DOM
+  firstItemNameSpan.innerHTML = 'Manually Changed Alice';
+
+  // Update the second item's name through the reactive system
+  context.people[1].name = 'Robert';
+  await new Promise(r => setTimeout(r, 5));
+
+  // Get updated rendered elements
+  const updatedItems = root.querySelectorAll('[res-rendered="true"]');
+
+  // Verify the manually changed first item was NOT overwritten
+  const updatedFirstItemNameSpan = updatedItems[0].querySelector('[res-prop="name"]');
+  assert.strictEqual(updatedFirstItemNameSpan.innerHTML, 'Manually Changed Alice',
+    'First item manual change should be preserved');
+
+  // Verify the second item was updated correctly
+  const updatedSecondItemNameSpan = updatedItems[1].querySelector('[res-prop="name"]');
+  assert.strictEqual(updatedSecondItemNameSpan.innerHTML, 'Robert',
+    'Second item should be updated to Robert');
+
+  // Verify the third item remains unchanged
+  const updatedThirdItemNameSpan = updatedItems[2].querySelector('[res-prop="name"]');
+  assert.strictEqual(updatedThirdItemNameSpan.innerHTML, 'Charlie',
+    'Third item should remain unchanged');
+});
+
+test('manual DOM changes in one array should be preserved when updating a different array', async () => {
+  // Create DOM structure with two separate arrays
+  const root = new MockElement('div');
+
+  // First array container
+  const firstArrayContainer = new MockElement('ul');
+  const firstArrayTemplate = new MockElement('li');
+  firstArrayTemplate.setAttribute('res', 'teamA');
+  const firstArrayNameSpan = new MockElement('span');
+  firstArrayNameSpan.setAttribute('res-prop', 'name');
+  firstArrayTemplate.appendChild(firstArrayNameSpan);
+  firstArrayContainer.appendChild(firstArrayTemplate);
+  root.appendChild(firstArrayContainer);
+
+  // Second array container
+  const secondArrayContainer = new MockElement('ul');
+  const secondArrayTemplate = new MockElement('li');
+  secondArrayTemplate.setAttribute('res', 'teamB');
+  const secondArrayNameSpan = new MockElement('span');
+  secondArrayNameSpan.setAttribute('res-prop', 'name');
+  secondArrayTemplate.appendChild(secondArrayNameSpan);
+  secondArrayContainer.appendChild(secondArrayTemplate);
+  root.appendChild(secondArrayContainer);
+
+  const { context, resonant } = createResonantDom(root);
+
+  // Initialize both arrays
+  resonant.add('teamA', [
+    { name: 'Alice' },
+    { name: 'Bob' }
+  ]);
+  resonant.add('teamB', [
+    { name: 'Charlie' },
+    { name: 'Diana' }
+  ]);
+
+  // Get rendered elements for both arrays
+  const teamAItems = firstArrayContainer.querySelectorAll('[res="teamA"][res-rendered="true"]');
+  const teamBItems = secondArrayContainer.querySelectorAll('[res="teamB"][res-rendered="true"]');
+
+  assert.strictEqual(teamAItems.length, 2, 'Should have 2 teamA items');
+  assert.strictEqual(teamBItems.length, 2, 'Should have 2 teamB items');
+
+  // Verify initial values
+  assert.strictEqual(teamAItems[0].querySelector('[res-prop="name"]').innerHTML, 'Alice');
+  assert.strictEqual(teamAItems[1].querySelector('[res-prop="name"]').innerHTML, 'Bob');
+  assert.strictEqual(teamBItems[0].querySelector('[res-prop="name"]').innerHTML, 'Charlie');
+  assert.strictEqual(teamBItems[1].querySelector('[res-prop="name"]').innerHTML, 'Diana');
+
+  // Manually modify the second array's first item
+  const teamBFirstItemNameSpan = teamBItems[0].querySelector('[res-prop="name"]');
+  teamBFirstItemNameSpan.innerHTML = 'Manually Changed Charlie';
+
+  // Update the FIRST array (teamA) through the reactive system
+  context.teamA[0].name = 'Alicia';
+  await new Promise(r => setTimeout(r, 5));
+
+  // Get updated rendered elements
+  const updatedTeamAItems = firstArrayContainer.querySelectorAll('[res="teamA"][res-rendered="true"]');
+  const updatedTeamBItems = secondArrayContainer.querySelectorAll('[res="teamB"][res-rendered="true"]');
+
+  // Verify the first array was updated correctly
+  assert.strictEqual(updatedTeamAItems[0].querySelector('[res-prop="name"]').innerHTML, 'Alicia',
+    'TeamA first item should be updated to Alicia');
+  assert.strictEqual(updatedTeamAItems[1].querySelector('[res-prop="name"]').innerHTML, 'Bob',
+    'TeamA second item should remain Bob');
+
+  // Verify the second array's manual change was preserved (CRITICAL TEST)
+  const updatedTeamBFirstItemNameSpan = updatedTeamBItems[0].querySelector('[res-prop="name"]');
+  assert.strictEqual(updatedTeamBFirstItemNameSpan.innerHTML, 'Manually Changed Charlie',
+    'TeamB manual change should be preserved when teamA is updated');
+  assert.strictEqual(updatedTeamBItems[1].querySelector('[res-prop="name"]').innerHTML, 'Diana',
+    'TeamB second item should remain Diana');
+});

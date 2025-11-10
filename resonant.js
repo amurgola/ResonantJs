@@ -406,6 +406,27 @@
 
         add(variableName, value, persist) {
             value = this.persist(variableName, value, persist);
+
+            //Check if Value is a fetch promise, and resolve as toJson before adding
+            if (value.constructor.name === 'Response') {
+                value.json().then(resolvedValue => {
+                    this.add(variableName, resolvedValue, persist);
+                }).catch(err => {
+                    console.error(`Resonant: Error resolving fetch response for variable "${variableName}":`, err);
+                });
+                return;
+            }
+
+            // Check if Value is promise, and resolve before adding
+            if (value instanceof Promise) {
+                value.then(resolvedValue => {
+                    this.add(variableName, resolvedValue, persist);
+                }).catch(err => {
+                    console.error(`Resonant: Error resolving promise for variable "${variableName}":`, err);
+                });
+                return;
+            }
+
             if (Array.isArray(value)) {
                 this.data[variableName] = new ObservableArray(variableName, this, ...value);
                 this.arrayDataChangeDetection[variableName] = Array.prototype.slice.call(this.data[variableName]);
@@ -820,12 +841,16 @@
                 template = window[tplKey];
             }
 
+            // Build a map of existing elements by their key
             const existingElements = new Map();
-            container.querySelectorAll(`[res="${variablePath}"][res-rendered="true"]`).forEach(element => {
+            const existingElementsList = Array.from(container.querySelectorAll(`[res="${variablePath}"][res-rendered="true"]`));
+            existingElementsList.forEach(element => {
                 const key = element.getAttribute('res-key');
                 if (key) existingElements.set(key, element);
             });
-            container.querySelectorAll(`[res="${variablePath}"][res-rendered="true"]`).forEach(elm => elm.remove());
+
+            const changedSet = this._changedArrayIndices[variablePath] || this._changedArrayIndices[this._getRootAndPath(variablePath).root];
+            const usedElements = new Set();
 
             arrayValue.forEach((instance, index) => {
                 let elementKey = null;
@@ -833,11 +858,10 @@
                 if (!elementKey) elementKey = String(index);
 
                 let elementToUse;
-                const changedSet = this._changedArrayIndices[variablePath] || this._changedArrayIndices[this._getRootAndPath(variablePath).root];
-                const shouldReuse = existingElements.has(elementKey) && !(changedSet && changedSet.has(index));
+                let shouldReuse = existingElements.has(elementKey) && !(changedSet && changedSet.has(index));
                 if (shouldReuse) {
                     elementToUse = existingElements.get(elementKey);
-                    existingElements.delete(elementKey);
+                    usedElements.add(elementToUse);
                     elementToUse.setAttribute("res-index", index);
                 } else {
                     elementToUse = template.cloneNode(true);
@@ -849,39 +873,57 @@
                 }
                 elementToUse.setAttribute("res-index", index);
 
-                if (!isObject(instance)) {
-                    const anyPlace = elementToUse.querySelector('[res-prop=""]');
-                    if (anyPlace) {
-                        anyPlace.innerHTML = String(instance);
+                // Only render primitive content for new elements, not reused ones
+                // But always update nested arrays/objects as they may have changed
+                if (!shouldReuse) {
+                    if (!isObject(instance)) {
+                        const anyPlace = elementToUse.querySelector('[res-prop=""]');
+                        if (anyPlace) {
+                            anyPlace.innerHTML = String(instance);
+                        } else {
+                            elementToUse.innerHTML = String(instance);
+                        }
                     } else {
-                        elementToUse.innerHTML = String(instance);
+                        const keys = Object.keys(instance);
+                        keys.forEach(key => {
+                            let overrideInstanceValue = null;
+                            let subEl = elementToUse.querySelector(`[res-prop="${key}"]`);
+                            if (!subEl) {
+                                subEl = elementToUse.querySelector('[res-prop=""]');
+                                overrideInstanceValue = instance;
+                            }
+                            if (subEl) {
+                                const value = this._resolveValue(instance, key, overrideInstanceValue);
+                                const tag = subEl.tagName;
+                                if ((tag === 'INPUT' || tag === 'TEXTAREA') &&
+                                    !Array.isArray(value) &&
+                                    !isObject(value)) {
+                                    const prev = value;
+                                    this._handleInputElement(
+                                        subEl,
+                                        value,
+                                        (newValue) => {
+                                            instance[key] = newValue;
+                                            this._queueUpdate(this._getRootAndPath(variablePath).root, 'modified', instance, key, prev, index, `${index}.${key}`);
+                                        }
+                                    );
+                                }
+                                else if (!Array.isArray(value) && !isObject(value)) {
+                                    subEl.innerHTML = value ?? '';
+                                }
+                            }
+                        });
                     }
-                } else {
+                }
+
+                // Always update nested arrays and objects (even for reused elements)
+                if (isObject(instance)) {
                     const keys = Object.keys(instance);
                     keys.forEach(key => {
-                        let overrideInstanceValue = null;
                         let subEl = elementToUse.querySelector(`[res-prop="${key}"]`);
-                        if (!subEl) {
-                            subEl = elementToUse.querySelector('[res-prop=""]');
-                            overrideInstanceValue = instance;
-                        }
                         if (subEl) {
-                            const value = this._resolveValue(instance, key, overrideInstanceValue);
-                            const tag = subEl.tagName;
-                            if ((tag === 'INPUT' || tag === 'TEXTAREA') &&
-                                !Array.isArray(value) &&
-                                !isObject(value)) {
-                                const prev = value;
-                                this._handleInputElement(
-                                    subEl,
-                                    value,
-                                    (newValue) => {
-                                        instance[key] = newValue;
-                                        this._queueUpdate(this._getRootAndPath(variablePath).root, 'modified', instance, key, prev, index, `${index}.${key}`);
-                                    }
-                                );
-                            }
-                            else if (Array.isArray(value)) {
+                            const value = this._resolveValue(instance, key, null);
+                            if (Array.isArray(value)) {
                                 let parentKey = null;
                                 try { parentKey = arrayValue[index]?.key; } catch (_) {}
                                 this._renderNestedArray(subEl, value, parentKey, variablePath);
@@ -895,9 +937,6 @@
                                     }
                                 });
                             }
-                            else {
-                                subEl.innerHTML = value ?? '';
-                            }
                         }
                     });
                 }
@@ -905,7 +944,15 @@
                 this._handleDisplayElements(elementToUse, instance, variablePath);
                 this._bindClickEvents(elementToUse, instance, arrayValue);
 
+                // Always append to ensure correct order (appendChild moves existing elements)
                 container.appendChild(elementToUse);
+            });
+
+            // Remove elements that weren't reused
+            existingElementsList.forEach(element => {
+                if (!usedElements.has(element)) {
+                    element.remove();
+                }
             });
         }
 
