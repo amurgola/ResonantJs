@@ -15,7 +15,7 @@
 - **Built-in Persistence**: Automatic localStorage integration for data persistence
 - **Dynamic Styling**: Conditional CSS classes and styles based on your data
 - **Performance**: Efficient updates with minimal overhead
-- **Tiny Footprint**: Under 11.5KB minified, perfect for any project size
+- **Tiny Footprint**: Under 17KB minified, perfect for any project size
 
 ---
 
