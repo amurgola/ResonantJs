@@ -36,15 +36,20 @@
             }
         }
 
-        static _ensureKeysRecursive(value, resonant) {
+        static _ensureKeysRecursive(value, resonant, visited = new WeakSet()) {
             if (!isObject(value)) return value;
+
+            // Detect circular references
+            if (visited.has(value)) return value;
+            visited.add(value);
+
             if (Array.isArray(value)) {
-                value.forEach(v => ObservableArray._ensureKeysRecursive(v, resonant));
+                value.forEach(v => ObservableArray._ensureKeysRecursive(v, resonant, visited));
                 return value;
             }
             ObservableArray._ensureKey(value, resonant);
             Object.keys(value).forEach(k => {
-                ObservableArray._ensureKeysRecursive(value[k], resonant);
+                ObservableArray._ensureKeysRecursive(value[k], resonant, visited);
             });
             return value;
         }
@@ -408,7 +413,7 @@
             value = this.persist(variableName, value, persist);
 
             //Check if Value is a fetch promise, and resolve as toJson before adding
-            if (value.constructor.name === 'Response') {
+            if (value && value.constructor && value.constructor.name === 'Response') {
                 value.json().then(resolvedValue => {
                     this.add(variableName, resolvedValue, persist);
                 }).catch(err => {

@@ -223,7 +223,7 @@ test('array filter method (non-mutating) returns new filtered array', () => {
 
   // Filtered should have correct values
   assert(Array.isArray(filtered));
-  assert.deepStrictEqual(filtered, [4, 5]);
+  assert.deepStrictEqual(Array.from(filtered), [4, 5]);
 });
 
 test('array concat maintains reactivity of original', async () => {
@@ -240,7 +240,7 @@ test('array concat maintains reactivity of original', async () => {
   assert.deepStrictEqual(Array.from(context.concatArr), [1, 2, 3]);
 
   // Combined should have all elements
-  assert.deepStrictEqual(combined, [1, 2, 3, 4, 5]);
+  assert.deepStrictEqual(Array.from(combined), [1, 2, 3, 4, 5]);
 
   // Original should still be reactive
   context.concatArr.push(6);
@@ -264,7 +264,7 @@ test('array slice maintains reactivity of original', async () => {
   assert.deepStrictEqual(Array.from(context.sliceArr), [1, 2, 3, 4, 5]);
 
   // Sliced should have correct elements
-  assert.deepStrictEqual(sliced, [2, 3]);
+  assert.deepStrictEqual(Array.from(sliced), [2, 3]);
 
   // Original should still be reactive
   context.sliceArr[0] = 10;
@@ -288,7 +288,7 @@ test('array map maintains reactivity of original', async () => {
   assert.deepStrictEqual(Array.from(context.mapArr), [1, 2, 3]);
 
   // Mapped should have transformed values
-  assert.deepStrictEqual(mapped, [2, 4, 6]);
+  assert.deepStrictEqual(Array.from(mapped), [2, 4, 6]);
 
   // Original should still be reactive
   context.mapArr.push(4);
