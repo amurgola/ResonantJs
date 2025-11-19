@@ -451,6 +451,26 @@
             });
         }
 
+        bind(variableName, persist) {
+            // Check if variableName is a string
+            if (typeof variableName !== 'string') {
+                console.error('Resonant.bind: variableName must be a string');
+                return;
+            }
+
+            // Check if variable exists in window scope
+            if (!(variableName in window)) {
+                console.warn(`Resonant.bind: variable "${variableName}" not found in window scope`);
+                return;
+            }
+
+            // Get the current value from the window object
+            const currentValue = window[variableName];
+
+            // Add it to the reactive system (this will replace window[variableName] with a getter/setter)
+            this.add(variableName, currentValue, persist);
+        }
+
         computed(computedName, computeFunction) {
             this.computedProperties[computedName] = computeFunction;
             this.computedDependencies[computedName] = new Set();

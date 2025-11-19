@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResonantJS - bind() Feature Example</title>
+    <script src="../resonant.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .example {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .output {
+            margin-top: 15px;
+            padding: 10px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>ResonantJS - bind() Feature</h1>
+    <p>The <code>bind()</code> method allows you to make existing variables reactive.</p>
+
+    <div class="example">
+        <h2>Example 1: Bind a String Variable</h2>
+        <p>Initial variable: <code>var message = "Hello, World!"</code></p>
+        <button onclick="updateMessage()">Update Message</button>
+        <div class="output">
+            <strong>Current Message:</strong> <span res="message"></span>
+        </div>
+    </div>
+
+    <div class="example">
+        <h2>Example 2: Bind a Number Variable</h2>
+        <p>Initial variable: <code>var counter = 0</code></p>
+        <button onclick="incrementCounter()">Increment</button>
+        <button onclick="decrementCounter()">Decrement</button>
+        <div class="output">
+            <strong>Counter:</strong> <span res="counter"></span>
+        </div>
+    </div>
+
+    <div class="example">
+        <h2>Example 3: Bind an Object</h2>
+        <p>Initial variable: <code>var user = { name: "John", age: 30 }</code></p>
+        <button onclick="updateUser()">Update User</button>
+        <div class="output">
+            <div res="user">
+                <strong>Name:</strong> <span res-prop="name"></span><br>
+                <strong>Age:</strong> <span res-prop="age"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="example">
+        <h2>Example 4: Bind an Array</h2>
+        <p>Initial variable: <code>var items = ["Apple", "Banana"]</code></p>
+        <button onclick="addItem()">Add Item</button>
+        <button onclick="removeItem()">Remove Last Item</button>
+        <div class="output">
+            <strong>Items:</strong>
+            <ul res="items">
+                <li><span res-prop=""></span></li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Create existing variables BEFORE initializing ResonantJS
+        var message = "Hello, World!";
+        var counter = 0;
+        var user = { name: "John", age: 30 };
+        var items = ["Apple", "Banana"];
+
+        // Initialize ResonantJS
+        const resonant = new Resonant();
+
+        // Bind the existing variables to make them reactive
+        resonant.bind("message");
+        resonant.bind("counter");
+        resonant.bind("user");
+        resonant.bind("items");
+
+        // Now any updates to these variables will automatically update the DOM!
+
+        // Example 1 functions
+        function updateMessage() {
+            message = "ResonantJS is awesome!";
+        }
+
+        // Example 2 functions
+        function incrementCounter() {
+            counter++;
+        }
+
+        function decrementCounter() {
+            counter--;
+        }
+
+        // Example 3 functions
+        function updateUser() {
+            user.name = "Jane Doe";
+            user.age = 25;
+        }
+
+        // Example 4 functions
+        const fruitNames = ["Cherry", "Date", "Elderberry", "Fig", "Grape"];
+        let fruitIndex = 0;
+
+        function addItem() {
+            const newFruit = fruitNames[fruitIndex % fruitNames.length];
+            items.push(newFruit);
+            fruitIndex++;
+        }
+
+        function removeItem() {
+            if (items.length > 0) {
+                items.pop();
+            }
+        }
+
+        // Add callbacks to log changes
+        resonant.addCallback("message", (newVal) => {
+            console.log("Message changed to:", newVal);
+        });
+
+        resonant.addCallback("counter", (newVal) => {
+            console.log("Counter changed to:", newVal);
+        });
+
+        resonant.addCallback("user", (newVal, item, action) => {
+            console.log("User modified:", action, newVal);
+        });
+
+        resonant.addCallback("items", (newVal, item, action) => {
+            console.log("Items array:", action, item);
+        });
+    </script>
+</body>
+</html>
