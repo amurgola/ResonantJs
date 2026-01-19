@@ -36,20 +36,15 @@
             }
         }
 
-        static _ensureKeysRecursive(value, resonant, visited = new WeakSet()) {
+        static _ensureKeysRecursive(value, resonant) {
             if (!isObject(value)) return value;
-
-            // Detect circular references
-            if (visited.has(value)) return value;
-            visited.add(value);
-
             if (Array.isArray(value)) {
-                value.forEach(v => ObservableArray._ensureKeysRecursive(v, resonant, visited));
+                value.forEach(v => ObservableArray._ensureKeysRecursive(v, resonant));
                 return value;
             }
             ObservableArray._ensureKey(value, resonant);
             Object.keys(value).forEach(k => {
-                ObservableArray._ensureKeysRecursive(value[k], resonant, visited);
+                ObservableArray._ensureKeysRecursive(value[k], resonant);
             });
             return value;
         }
@@ -69,13 +64,11 @@
                 Object.defineProperty(target, PROXY_FLAG, { value: true, enumerable: false });
             } catch (_) {}
 
-            // Ensure keys and wrap nested arrays/objects so deep mutations are observable
             for (let i = 0; i < target.length; i++) {
                 const item = target[i];
                 if (isObject(item)) {
                     ObservableArray._ensureKeysRecursive(item, resonant);
                 }
-                // Wrap child arrays/objects to ensure they are proxied
                 target[i] = ObservableArray._wrapAny(item, rootName, resonant, path ? `${path}.${i}` : `${i}`);
             }
 
@@ -92,7 +85,7 @@
                 resonant._queueUpdate(rootName, 'modified', item, property, oldValue, index, path);
             };
             const notifyUpdated = (payloadItem = null) => {
-                // Only used for update() and forceUpdate()
+
                 const action = isNestedArray ? 'modified' : 'updated';
                 const itemForCallback = payloadItem !== null ? payloadItem : target;
                 resonant._queueUpdate(rootName, action, itemForCallback, null, undefined, null, path);
@@ -223,18 +216,15 @@
                         },
                         sort: (cmp) => {
                             Array.prototype.sort.call(t, cmp);
-                            // no 'updated' for sort (back compat)
                             return receiver;
                         },
                         reverse: () => {
                             Array.prototype.reverse.call(t);
-                            // no 'updated' for reverse (back compat)
                             return receiver;
                         },
                         filter: (fn, actuallyFilter = true) => {
                             const result = Array.prototype.filter.call(t, fn);
                             if (actuallyFilter) {
-                                // back-compat: trigger filtered with undefined item
                                 resonant._queueUpdate(rootName, 'filtered', undefined, null, undefined, null, path);
                             }
                             return result;
@@ -412,8 +402,7 @@
         add(variableName, value, persist) {
             value = this.persist(variableName, value, persist);
 
-            //Check if Value is a fetch promise, and resolve as toJson before adding
-            if (value && value.constructor && value.constructor.name === 'Response') {
+            if (value.constructor.name === 'Response') {
                 value.json().then(resolvedValue => {
                     this.add(variableName, resolvedValue, persist);
                 }).catch(err => {
@@ -422,7 +411,6 @@
                 return;
             }
 
-            // Check if Value is promise, and resolve before adding
             if (value instanceof Promise) {
                 value.then(resolvedValue => {
                     this.add(variableName, resolvedValue, persist);
@@ -528,7 +516,7 @@
                             } else {
                                 wrapped = wrap(value, childPath);
                             }
-                            // Cache the proxy back onto the raw target without triggering setters
+
                             target[property] = wrapped;
                             return wrapped;
                         }
@@ -568,14 +556,12 @@
                 let expr = condition || '';
                 let show = false;
 
-                // If in array item context, map root variable to 'item'
                 if (variableName) {
                     const { root } = this._getRootAndPath(variableName);
                     if (instance && isObject(instance)) {
                         const rootPattern = new RegExp(`\\b${root}\\b`, 'g');
                         expr = expr.replace(rootPattern, 'item');
 
-                        // Add item. prefix for bare props that exist on instance
                         const tokens = expr.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
                         tokens.forEach(tok => {
                             if (tok === 'item' || tok === 'true' || tok === 'false' || tok === 'null' || tok === 'undefined') return;
@@ -587,13 +573,9 @@
                     }
                 }
 
-                // Try evaluate with item context
                 try {
-                    // eslint-disable-next-line no-new-func
                     show = !!(new Function('item', 'state', `return (${expr});`))(instance, this.data);
                 } catch (e) {
-                    // Fallback: evaluate in global context (back-compat)
-                    // eslint-disable-next-line no-new-func
                     show = !!(new Function(`return (${condition});`))();
                 }
 
@@ -622,7 +604,6 @@
                         const fn = (window && window[functionName]) || null;
                         if (typeof fn === 'function') {
                             try {
-                                // Pass item if handler expects it, otherwise call without args
                                 if (fn.length > 0) fn(instance);
                                 else fn();
                             } catch (e) {
@@ -684,7 +665,6 @@
             }
             this.pendingUpdates.get(variableName).push({ action, item, property, oldValue, index, path });
 
-            // Track which indices in a top-level array changed to support selective re-rendering
             if (!this._changedArrayIndices[variableName]) {
                 this._changedArrayIndices[variableName] = new Set();
             }
@@ -712,7 +692,6 @@
                         this._triggerCallbacks(variableName, u);
                     });
 
-                    // Recompute computed props affected by this variable
                     const changedTokens = new Set();
                     updates.forEach(u => {
                         changedTokens.add(variableName);
@@ -731,7 +710,7 @@
                     this.updateElement(variableName);
                     this.updateDisplayConditionalsFor(variableName);
                     this.updateStylesFor(variableName);
-                    // Clear tracked changed indices after render
+
                     if (this._changedArrayIndices[variableName]) {
                         delete this._changedArrayIndices[variableName];
                     }
@@ -744,7 +723,6 @@
                 this.callbacks[variableName].forEach(callback => {
                     const item = callbackData.item || callbackData.oldValue;
                     try {
-                        // Use global reference to maximize identity stability for tests
                         const currentValue = (typeof window !== 'undefined' && window[variableName] !== undefined)
                             ? window[variableName]
                             : this.data[variableName];
@@ -846,7 +824,6 @@
                 template = window[tplKey];
             }
 
-            // Build a map of existing elements by their key
             const existingElements = new Map();
             const existingElementsList = Array.from(container.querySelectorAll(`[res="${variablePath}"][res-rendered="true"]`));
             existingElementsList.forEach(element => {
@@ -878,8 +855,6 @@
                 }
                 elementToUse.setAttribute("res-index", index);
 
-                // Only render primitive content for new elements, not reused ones
-                // But always update nested arrays/objects as they may have changed
                 if (!shouldReuse) {
                     if (!isObject(instance)) {
                         const anyPlace = elementToUse.querySelector('[res-prop=""]');
@@ -921,7 +896,6 @@
                     }
                 }
 
-                // Always update nested arrays and objects (even for reused elements)
                 if (isObject(instance)) {
                     const keys = Object.keys(instance);
                     keys.forEach(key => {
@@ -949,11 +923,9 @@
                 this._handleDisplayElements(elementToUse, instance, variablePath);
                 this._bindClickEvents(elementToUse, instance, arrayValue);
 
-                // Always append to ensure correct order (appendChild moves existing elements)
                 container.appendChild(elementToUse);
             });
 
-            // Remove elements that weren't reused
             existingElementsList.forEach(element => {
                 if (!usedElements.has(element)) {
                     element.remove();
@@ -1006,7 +978,7 @@
             const conditionalElements = document.querySelectorAll(`[res-display*="${variableName}"]`);
             conditionalElements.forEach(conditionalElement => {
                 const condition = conditionalElement.getAttribute('res-display');
-                // Determine context instance
+
                 let instance = null;
                 let node = conditionalElement;
                 while (node) {
@@ -1045,7 +1017,7 @@
                         styleElement.removeAttribute('res-styles');
                     }
 
-                    // find context item
+
                     let parent = styleElement;
                     let boundPath = null;
                     let index = null;
@@ -1072,7 +1044,7 @@
                         const rootPattern = new RegExp(`\\b${root}\\b`, 'g');
                         expr = expr.replace(rootPattern, 'item');
                     }
-                    // eslint-disable-next-line no-new-func
+
                     const styleClass = (new Function('item', 'state', `return (${expr});`))(ctxItem, this.data);
 
                     if (typeof styleClass === 'string' && styleClass.trim()) {
