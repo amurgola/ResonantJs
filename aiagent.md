@@ -1,112 +1,171 @@
-# Using ResonantJs with AI Agents
+# ResonantJs -- AI Agent Reference
 
-ResonantJs is a lightweight framework that adds reactive data-binding to vanilla JavaScript applications. The library can be leveraged by AI agents when generating or manipulating front-end code. Below is a high-level overview of its features and how an agent might use them.
+ResonantJs adds reactive data-binding to vanilla HTML/JS pages. One `<script>` tag, no build step. This document gives an AI agent everything it needs to generate working ResonantJs code.
 
-## Core Concepts
-
-- **Data Binding (`res`)** – Attach a JavaScript variable to an element so that UI updates whenever the value changes.
-- **Object Properties (`res-prop`)** – Bind specific properties of an object to nested elements.
-- **Array Rendering** – Automatically generate a list from an array of data using a template element.
-- **Conditional Display (`res-display`)** – Show or hide elements based on expressions.
-- **Dynamic Styling (`res-style`)** – Conditionally apply CSS classes or inline styles.
-- **Event Handling (`res-onclick`)** – Link element events to functions with access to bound data.
-- **Input Binding** – Two-way binding for input elements such as text fields, checkboxes, or select menus.
-
-## Key Features
-
-- **Reactive Data Management** – Initialize variables with `add` or `addAll`. Any update to these values immediately reflects in the DOM.
-- **Event Callbacks** – Register callbacks via `addCallback` to react to data changes and chain side effects.
-- **Persistence** – Optionally persist values to `localStorage` so state survives page reloads.
-- **Advanced Array Operations** – Observable arrays expose methods like `update`, `set`, and `delete` to trigger UI refreshes when items change.
-- **Child Object Support** – Nested objects (e.g. `user.profile.email`) remain reactive through automatic proxy wrapping.
-- **Computed Properties** – Define reactive derived values using `computed()` that automatically update when their dependencies change.
-- **Component Patterns** – Encapsulate related variables and callbacks in functions for reuse across the page.
-
-## Example Workflow for an AI Agent
-
-1. **Initialize** a new `Resonant` instance when generating the page.
-2. **Add Variables** using `add` or `addAll` for any data that needs to be reactive. Enable persistence if needed.
-3. **Define Computed Properties** using `computed()` for derived values that should automatically update when dependencies change.
-4. **Bind Elements** in generated HTML using `res`, `res-prop`, and related attributes so DOM updates automatically.
-5. **Attach Callbacks** with `addCallback` when additional logic is required after data changes. This can be used to interact with other services.
-6. **Manipulate Data** directly in generated scripts. Changes propagate to the interface with no manual DOM manipulation.
-
-## When to Use
-
-- Building dynamic UI components without importing a heavy framework.
-- Keeping local state in sync with DOM elements in generated pages.
-- Rapidly prototyping interactive features that persist across sessions using localStorage.
-
-For more detailed examples, see the `examples` folder and the full README documentation in this repository.
-
-## Examples
-
-### Simple Counter
+## TL;DR
 
 ```html
-<h1>Counter: <span res="counter"></span></h1>
-<button onclick="counter++">Increment</button>
-
+<script src="https://unpkg.com/resonantjs@latest/resonant.min.js"></script>
 <script>
-const r = new Resonant();
-r.add('counter', 0, true); // persisted value
+  const res = new Resonant();
+  res.add('count', 0);      // reactive variable
+  count++;                   // DOM updates automatically
 </script>
+<span res="count"></span>    <!-- bound to the variable -->
 ```
 
-### Todo List
+---
+
+## JavaScript API
+
+| Method | Signature | Description |
+|---|---|---|
+| Constructor | `new Resonant()` | Create an instance. One per page is typical. |
+| `add` | `add(name, value?, persist?)` | Register a reactive variable. Omit `value` to bind an existing `window` variable. If only two args and the second is a `boolean`, it is treated as the persist flag. |
+| `addAll` | `addAll({ name: value, ... })` | Register multiple variables at once. |
+| `addCallback` | `addCallback(name, fn)` | `fn(currentValue, changedItem, action)` fires on every change. Actions: `added`, `removed`, `modified`, `updated`, `filtered`. |
+| `computed` | `computed(name, fn)` | Define a read-only derived value. Dependencies are tracked automatically. Chains are supported (computed A depending on computed B). |
+
+### Binding existing window variables
+
+```js
+window.username = 'Alice';
+res.add('username');        // picks up 'Alice', makes it reactive
+res.add('username', true);  // same, plus persists to localStorage
+```
+
+If the variable doesn't exist on `window`, a warning is logged and no binding is created.
+
+### Persistence
+
+Pass `true` as the persist flag to sync a variable to `localStorage` under the key `res_<name>`. On page load, the stored value is restored automatically.
+
+```js
+res.add('theme', 'light', true);
+```
+
+---
+
+## HTML Attributes
+
+| Attribute | Purpose | Scope |
+|---|---|---|
+| `res="varName"` | Bind element to variable. For scalars/objects, sets `innerHTML`. For arrays, the element becomes a **template** that is cloned per item. | Any element |
+| `res-prop="key"` | Bind to a property of the parent `res` object or array item. Use `res-prop=""` (empty) to bind the whole item. | Inside a `res` element |
+| `res-display="expr"` | JS expression. Element is shown (`display: inherit`) when truthy, hidden (`display: none`) when falsy. Inside arrays, bare property names resolve to the current item. | Any element |
+| `res-style="expr"` | JS expression returning a space-separated class string. Previous classes from the expression are removed before new ones are applied. | Any element |
+| `res-onclick="fnName"` | Call a global function on click. If the function declares a parameter, the current item is passed. | Inside a `res` element |
+| `res-onclick-remove="prop"` | Remove the current item from its parent array by matching the given property (e.g., `id`). | Inside an array template |
+
+---
+
+## Patterns
+
+### Scalar binding
 
 ```html
-<input res="newTodo" placeholder="Add task" />
-<button onclick="addTodo()">Add</button>
+<span res="message"></span>
+```
 
+```js
+res.add('message', 'Hello');
+message = 'World'; // DOM updates
+```
+
+### Object binding
+
+```html
+<div res="user">
+  <span res-prop="name"></span>
+  <span res-prop="email"></span>
+</div>
+```
+
+```js
+res.add('user', { name: 'Alice', email: 'a@b.com' });
+user.name = 'Bob'; // only the name span updates
+```
+
+### Array rendering
+
+Place `res` on a template element inside a list container. ResonantJs hides the template and clones it per item.
+
+```html
 <ul>
-  <li res="todos">
-    <input type="checkbox" res-prop="done" />
+  <li res="items">
     <span res-prop="title"></span>
+    <button res-onclick-remove="id">x</button>
   </li>
 </ul>
-
-<script>
-const r = new Resonant();
-r.addAll({
-  todos: [{ title: 'Try Resonant', done: false }],
-  newTodo: ''
-});
-
-function addTodo() {
-  if (newTodo.trim()) {
-    todos.push({ title: newTodo, done: false });
-    newTodo = '';
-  }
-}
-</script>
 ```
 
-### Callbacks
+```js
+res.add('items', [
+  { id: 1, title: 'First' },
+  { id: 2, title: 'Second' }
+]);
+
+items.push({ id: 3, title: 'Third' });  // new <li> appears
+items[0].title = 'Updated';             // only that <li> re-renders
+items.splice(1, 1);                      // second <li> removed
+```
+
+### Array methods
+
+Reactive arrays support all standard `Array` methods plus:
+
+| Method | Description |
+|---|---|
+| `.set(index, value)` | Replace item at index |
+| `.delete(index)` | Remove item at index |
+| `.update(newArray)` | Replace entire array |
+| `.filterInPlace(fn)` | Mutating filter |
+| `.forceUpdate()` | Force re-render without data change |
+
+### Conditional display inside arrays
 
 ```html
 <ul>
-  <li res="tasks">
+  <li res="people">
     <span res-prop="name"></span>
-    <button onclick="remove(item)">Remove</button>
+    <span res-display="active" class="badge">Active</span>
   </li>
 </ul>
-
-<script>
-const r = new Resonant();
-r.addAll({ tasks: [] });
-r.addCallback('tasks', (tasks, task, action) => {
-  console.log(`Action: ${action}`, task);
-});
-
-function remove(task) {
-  const idx = tasks.indexOf(task);
-  tasks.delete(idx);
-}
-</script>
 ```
 
-### Nested Child Objects
+Inside array templates, bare property names like `active` resolve to the current item's property. When one item's `active` changes, only that item's display condition is re-evaluated -- other items are untouched.
+
+### Computed properties
+
+```js
+res.add('price', 100);
+res.add('taxRate', 0.08);
+
+res.computed('tax',   () => price * taxRate);
+res.computed('total', () => price + tax);     // chains work
+```
+
+```html
+<span res="total"></span>  <!-- updates when price or taxRate changes -->
+```
+
+Computed properties are read-only. Attempting to set one logs a warning.
+
+### Two-way input binding
+
+```html
+<input type="text" res="name" />
+<input type="checkbox" res="user.active" />
+<textarea res="notes"></textarea>
+<select res="country">
+  <option value="us">US</option>
+  <option value="uk">UK</option>
+</select>
+```
+
+### Nested data
+
+Objects and arrays can be nested to arbitrary depth. All levels are reactive.
 
 ```html
 <div res="company.departments">
@@ -118,114 +177,97 @@ function remove(task) {
     </ul>
   </div>
 </div>
-
-<script>
-const r = new Resonant();
-r.add('company', {
-  departments: [
-    {
-      name: 'Engineering',
-      teams: [
-        { name: 'Frontend', members: [{ name: 'Alice' }] }
-      ]
-    }
-  ]
-});
-</script>
 ```
 
-### Computed Properties
+```js
+res.add('company', {
+  departments: [{
+    name: 'Engineering',
+    teams: [{
+      name: 'Frontend',
+      members: [{ name: 'Alice' }, { name: 'Bob' }]
+    }]
+  }]
+});
+
+company.departments[0].teams[0].members.push({ name: 'Charlie' });
+```
+
+### Callbacks
+
+```js
+res.addCallback('tasks', (value, item, action) => {
+  // action: 'added' | 'removed' | 'modified' | 'updated' | 'filtered'
+  console.log(action, item);
+});
+```
+
+---
+
+## Agent Workflow
+
+When generating a page with ResonantJs:
+
+1. Include the script tag: `<script src="https://unpkg.com/resonantjs@latest/resonant.min.js"></script>`
+2. Create one `Resonant` instance.
+3. Register variables with `add` or `addAll`. Use `true` for persistence when appropriate.
+4. Define `computed` properties for derived values.
+5. Add HTML attributes (`res`, `res-prop`, `res-display`, `res-style`, `res-onclick`, `res-onclick-remove`) to bind the DOM.
+6. Manipulate data directly -- the DOM updates automatically.
+7. Use `addCallback` for side effects (API calls, logging, etc.).
+
+### Common mistakes to avoid
+
+- **Forgetting the template element**: `res` on an array must be placed on a single element inside a container (e.g., `<li>` inside `<ul>`). The element becomes the template.
+- **Setting computed properties**: They are read-only. Assign through their dependencies instead.
+- **Naming collisions**: Variables registered with `add` are exposed as globals on `window`. Avoid names that collide with built-in globals.
+- **Boolean values in `addAll`**: All values are passed through correctly, including `true`/`false`/`null`.
+
+---
+
+## Full Example: Shopping Cart
 
 ```html
-<div>
-  <input res="firstName" placeholder="First name" />
-  <input res="lastName" placeholder="Last name" />
-  <h2>Welcome, <span res="fullName"></span>!</h2>
-</div>
+<!doctype html>
+<html>
+<head>
+  <script src="https://unpkg.com/resonantjs@latest/resonant.min.js"></script>
+</head>
+<body>
+  <h1>Cart</h1>
 
-<script>
-const r = new Resonant();
-r.addAll({
-  firstName: 'John',
-  lastName: 'Doe'
-});
+  <table>
+    <tr res="items">
+      <td res-prop="name"></td>
+      <td>$<span res-prop="price"></span></td>
+      <td><input type="number" res-prop="qty" style="width:50px" /></td>
+      <td>$<span res-prop="lineTotal"></span></td>
+      <td><button res-onclick-remove="name">Remove</button></td>
+    </tr>
+  </table>
 
-// Computed property automatically updates when firstName or lastName changes
-r.computed('fullName', () => {
-  return firstName + ' ' + lastName;
-});
-</script>
+  <p>Subtotal: $<span res="subtotal"></span></p>
+  <p>Tax: $<span res="tax"></span></p>
+  <p><strong>Total: $<span res="total"></span></strong></p>
+
+  <script>
+    const res = new Resonant();
+    res.addAll({
+      items: [
+        { name: 'Widget', price: 10, qty: 2 },
+        { name: 'Gadget', price: 25, qty: 1 }
+      ],
+      taxRate: 0.08
+    });
+
+    res.computed('subtotal', () =>
+      items.reduce((sum, i) => sum + i.price * i.qty, 0)
+    );
+    res.computed('tax',   () => +(subtotal * taxRate).toFixed(2));
+    res.computed('total', () => +(subtotal + tax).toFixed(2));
+  </script>
+</body>
+</html>
 ```
 
-### Shopping Cart with Computed Totals
-
-```html
-<div res="items">
-  <div>
-    <span res-prop="name"></span> - 
-    $<span res-prop="price"></span> x 
-    <span res-prop="quantity"></span>
-  </div>
-</div>
-<div>
-  <strong>Subtotal: $<span res="subtotal"></span></strong><br>
-  <strong>Tax: $<span res="tax"></span></strong><br>
-  <strong>Total: $<span res="total"></span></strong>
-</div>
-
-<script>
-const r = new Resonant();
-r.addAll({
-  items: [
-    { name: 'Widget', price: 10, quantity: 2 },
-    { name: 'Gadget', price: 15, quantity: 1 }
-  ],
-  taxRate: 0.08
-});
-
-// Computed properties automatically recalculate when items change
-r.computed('subtotal', () => {
-  return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-});
-
-r.computed('tax', () => {
-  return subtotal * taxRate;
-});
-
-r.computed('total', () => {
-  return subtotal + tax;
-});
-</script>
-```
-
-### User Profile with Computed Display
-
-```html
-<div>
-  <input res="user.age" type="number" placeholder="Age" />
-  <input res="user.memberSince" type="number" placeholder="Member since year" />
-  <div>Status: <span res="membershipStatus"></span></div>
-  <div>Category: <span res="ageCategory"></span></div>
-</div>
-
-<script>
-const r = new Resonant();
-r.add('user', {
-  age: 25,
-  memberSince: 2020
-});
-
-r.computed('membershipStatus', () => {
-  const yearsAsMember = new Date().getFullYear() - user.memberSince;
-  if (yearsAsMember >= 5) return 'Gold Member';
-  if (yearsAsMember >= 2) return 'Silver Member';
-  return 'Bronze Member';
-});
-
-r.computed('ageCategory', () => {
-  if (user.age < 18) return 'Minor';
-  if (user.age < 65) return 'Adult';
-  return 'Senior';
-});
-</script>
-```
+For more examples, see the `examples/` folder and the full [README](./README.md).

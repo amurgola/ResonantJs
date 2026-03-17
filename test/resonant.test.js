@@ -6,7 +6,7 @@ const path = require('path');
 
 function createResonant() {
   const code = fs.readFileSync(path.join(__dirname, '..', 'resonant.js'), 'utf8');
-  const context = { console, setTimeout, clearTimeout };
+  const context = { console, setTimeout, clearTimeout, structuredClone };
   context.window = context;
   context.document = { querySelectorAll: () => [] };
 

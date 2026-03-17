@@ -3,146 +3,68 @@
 [![npm version](https://badge.fury.io/js/resonantjs.svg)](https://badge.fury.io/js/resonantjs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**ResonantJs** is a lightweight, powerful JavaScript framework that brings reactive data-binding to vanilla JavaScript applications. Build dynamic, responsive UIs with minimal code and zero dependencies.
+**Reactive data-binding for vanilla JavaScript. No build step. No virtual DOM. Just HTML attributes and plain objects.**
 
-> **Zero dependencies • ~17KB minified • Lightning fast • Easy to learn**
+```html
+<span res="count"></span>
+<button onclick="count++">+1</button>
 
-## Why Choose ResonantJs?
+<script src="https://unpkg.com/resonantjs@latest/resonant.min.js"></script>
+<script>
+  const res = new Resonant();
+  res.add('count', 0);
+</script>
+```
 
-- **True Reactivity**: Data changes automatically update the DOM with no manual manipulation required
-- **Attribute-Based**: Simple HTML attributes create powerful data bindings
-- **Deep Object Support**: Full reactivity for nested objects and arrays
-- **Built-in Persistence**: Automatic localStorage integration for data persistence
-- **Dynamic Styling**: Conditional CSS classes and styles based on your data
-- **Performance**: Efficient updates with minimal overhead
-- **Tiny Footprint**: Under 17KB minified, perfect for any project size
+Change `count` anywhere in your code and the DOM updates automatically.
 
 ---
 
-## Quick Start
+## Install
 
-### Installation
-
-#### NPM
 ```bash
 npm install resonantjs
 ```
 
-#### CDN
-```html
-<script src="https://unpkg.com/resonantjs@latest/resonant.js"></script>
-```
-
-### Hello World Example
+Or drop in a script tag:
 
 ```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>ResonantJs Demo</title>
-  <script src="https://unpkg.com/resonantjs@latest/resonant.js"></script>
-</head>
-<body>
-  <h1>Counter: <span res="counter"></span></h1>
-  <button onclick="counter++">Increment</button>
-  <button onclick="counter--">Decrement</button>
-  
-  <script>
-    const resonant = new Resonant();
-    resonant.add("counter", 0, true); // value, localStorage persistence
-  </script>
-</body>
-</html>
+<script src="https://unpkg.com/resonantjs@latest/resonant.min.js"></script>
 ```
 
-That's it. Your counter automatically updates the DOM and persists to localStorage.
+~18 KB minified. Zero dependencies.
 
 ---
 
-## Build a Todo App in 5 Minutes
+## Why ResonantJs?
 
-Copy and paste the snippet below into an `.html` file and open it in your browser.
-
-```html
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>ResonantJs • 5‑min Todo</title>
-    <style>
-      .completed { text-decoration: line-through; color: #888; }
-    </style>
-    <script src="https://unpkg.com/resonantjs@latest/resonant.js"></script>
-  </head>
-  <body>
-    <h1>Todos (<span res="tasks.length"></span>)</h1>
-
-    <input placeholder="Add a task..." res="newTask" />
-    <button onclick="addTask()">Add</button>
-
-    <ul>
-      <li res="tasks" res-display="newTask === '' || name.toLowerCase().includes(newTask.toLowerCase())">
-        <input type="checkbox" res-prop="completed" />
-        <span res-prop="name" res-style="completed ? 'completed' : ''"></span>
-        <button res-onclick="removeTask">Remove</button>
-      </li>
-    </ul>
-
-    <script>
-      const resonant = new Resonant();
-      resonant.addAll({
-        newTask: '',
-        tasks: [
-          { name: 'Learn ResonantJs', completed: false },
-          { name: 'Ship a feature', completed: true }
-        ]
-      });
-
-      function addTask() {
-        const title = newTask.trim();
-        if (!title) return;
-        tasks.unshift({ name: title, completed: false });
-        newTask = '';
-      }
-
-      function removeTask(item) {
-        const idx = tasks.indexOf(item);
-        if (idx !== -1) tasks.delete(idx);
-      }
-
-      // Optional: observe changes
-      resonant.addCallback('tasks', (list, item, action) => {
-        console.log('[tasks]', action, item);
-      });
-    </script>
-  </body>
-  </html>
-```
-
-### Key Takeaways
-
-- Use `res="tasks"` on a template element inside a list container to auto-render each item
-- Use `res-prop` inside that template to bind fields of the current item
-- Use `res-display` for inline filtering/conditional rendering; inside lists, bare props like `completed` refer to the current item
-- `res-style` returns a space-separated class string
-- Event handlers referenced by `res-onclick` are global functions and receive `item` when declared with a parameter
+| | |
+|---|---|
+| **No build tools** | Works with a single `<script>` tag. Ship today. |
+| **Familiar mental model** | Plain objects, plain arrays, plain HTML. No JSX, no templates, no compilation. |
+| **Automatic DOM updates** | Change a value, the page updates. Arrays, nested objects, computed properties -- all reactive. |
+| **Selective re-rendering** | Only the changed array item re-renders. Siblings stay untouched. |
+| **Built-in persistence** | One flag to sync any variable to `localStorage`. |
+| **Tiny footprint** | ~18 KB minified, zero dependencies. |
 
 ---
 
-## Core Concepts
+## Quick Tour
 
-### Data Binding (`res`)
-
-Bind HTML elements directly to your JavaScript variables:
+### Bind a variable
 
 ```html
-<span res="username"></span>        <!-- Simple variable -->
-<div res="user.profile.name"></div> <!-- Nested object property -->
+<h1>Hello, <span res="name"></span></h1>
 ```
 
-### Object Properties (`res-prop`)
+```js
+const res = new Resonant();
+res.add('name', 'World');
 
-Bind to specific properties within objects:
+name = 'ResonantJs'; // DOM updates instantly
+```
+
+### Bind an object
 
 ```html
 <div res="user">
@@ -151,508 +73,246 @@ Bind to specific properties within objects:
 </div>
 ```
 
-### Array Rendering
+```js
+res.add('user', { name: 'Alice', email: 'alice@example.com' });
 
-Automatically render arrays with template-based elements:
+user.name = 'Bob'; // only the name span updates
+```
+
+### Render an array
+
+Place `res` on a template element inside a list container. ResonantJs clones it once per item.
 
 ```html
 <ul>
-  <li res="todoItems">
+  <li res="tasks">
     <span res-prop="title"></span>
-    <button res-onclick="removeItem(item)">Delete</button>
+    <button res-onclick-remove="id">x</button>
   </li>
 </ul>
 ```
 
-### Conditional Display (`res-display`)
+```js
+res.add('tasks', [
+  { id: 1, title: 'Learn ResonantJs' },
+  { id: 2, title: 'Ship a feature' }
+]);
 
-Show or hide elements based on conditions:
-
-```html
-<div res-display="user.isActive">Welcome back!</div>
-<div res-display="tasks.length > 0">You have tasks</div>
-<div res-display="user.role === 'admin'">Admin Panel</div>
+tasks.push({ id: 3, title: 'Profit' }); // new <li> appears
+tasks[0].title = 'Done!';                // only that <li> re-renders
 ```
 
-### Dynamic Styling (`res-style`)
-
-Apply conditional CSS classes and styles:
+### Conditional display
 
 ```html
-<div res-style="task.completed ? 'completed' : 'pending'">Task</div>
-<span res-style="'priority-' + task.priority">High Priority</span>
+<div res-display="user.isAdmin">Admin Panel</div>
+<div res-display="tasks.length === 0">No tasks yet.</div>
 ```
 
-### Event Handling (`res-onclick`)
-
-Bind click events with context:
+### Dynamic classes
 
 ```html
-<button res-onclick="editTask(item)">Edit</button>
-<button res-onclick-remove="true">Delete Item</button>
+<span res-prop="title" res-style="done ? 'completed' : ''"></span>
 ```
 
-### Computed Properties
+### Computed properties
 
-Create reactive derived values that automatically update:
+Derived values that recalculate automatically when dependencies change. Chains work too.
 
-```javascript
-const resonant = new Resonant();
-resonant.add('firstName', 'John');
-resonant.add('lastName', 'Doe');
+```js
+res.add('price', 100);
+res.add('taxRate', 0.08);
 
-// Computed property automatically updates when dependencies change
-resonant.computed('fullName', () => {
-  return firstName + ' ' + lastName;
+res.computed('tax',   () => price * taxRate);
+res.computed('total', () => price + tax);    // chains: updates when tax updates
+```
+
+```html
+Total: $<span res="total"></span>
+```
+
+### Two-way input binding
+
+```html
+<input type="text" res="name" />
+<input type="checkbox" res="settings.darkMode" />
+<select res="country">...</select>
+```
+
+### Persistence
+
+```js
+res.add('theme', 'light', true); // third arg = persist to localStorage
+theme = 'dark';                  // saved automatically
+```
+
+### Bind existing variables
+
+Already have a variable on `window`? Register it without passing a value.
+
+```js
+window.username = 'Alice';
+res.add('username');       // picks up 'Alice', makes it reactive
+res.add('username', true); // same, but also persists to localStorage
+```
+
+### Event handling
+
+```html
+<button res-onclick="editTask">Edit</button>      <!-- receives the current item -->
+<button res-onclick-remove="id">Delete</button>    <!-- removes item by matching property -->
+```
+
+### Callbacks
+
+```js
+res.addCallback('tasks', (value, item, action) => {
+  console.log(action, item); // 'added', 'removed', 'modified', etc.
 });
 ```
 
-```html
-<span res="fullName"></span> <!-- Automatically shows "John Doe" -->
-```
+---
 
-### Input Binding
+## Build a Todo App
 
-Two-way data binding for form elements:
+Copy this into an `.html` file and open it in your browser.
 
 ```html
-<input type="text" res="user.name" />
-<input type="checkbox" res="settings.darkMode" />
-<select res="user.country">
-  <option value="us">United States</option>
-  <option value="uk">United Kingdom</option>
-</select>
+<!doctype html>
+<html>
+<head>
+  <style>.done { text-decoration: line-through; color: #999; }</style>
+  <script src="https://unpkg.com/resonantjs@latest/resonant.min.js"></script>
+</head>
+<body>
+  <h1>Todos (<span res="tasks.length"></span>)</h1>
+
+  <input placeholder="Add a task..." res="newTask" />
+  <button onclick="addTask()">Add</button>
+
+  <ul>
+    <li res="tasks">
+      <input type="checkbox" res-prop="done" />
+      <span res-prop="name" res-style="done ? 'done' : ''"></span>
+      <button res-onclick="removeTask">x</button>
+    </li>
+  </ul>
+
+  <script>
+    const res = new Resonant();
+    res.addAll({
+      newTask: '',
+      tasks: [
+        { name: 'Learn ResonantJs', done: false },
+        { name: 'Ship a feature', done: true }
+      ]
+    });
+
+    function addTask() {
+      const title = newTask.trim();
+      if (!title) return;
+      tasks.unshift({ name: title, done: false });
+      newTask = '';
+    }
+
+    function removeTask(item) {
+      const idx = tasks.indexOf(item);
+      if (idx !== -1) tasks.delete(idx);
+    }
+  </script>
+</body>
+</html>
 ```
 
 ---
 
-## Best Practices and Tips
+## API Reference
 
-- **Name your state clearly**: Variables you `add` become globals on `window` (e.g., `tasks`, `user`). Avoid collisions with existing globals.
-- **List templates**: In `res="items"` templates, you can reference current item fields directly (`completed`, `name`) or as `item.completed` — both work.
-- **Array updates**: Prefer `items.set(i, value)` over direct index assignment for clarity; both are reactive.
-- **Batch updates**: When replacing a whole list, use `items.update(newArray)` to emit a single coherent update.
-- **Object binding**: Use `res-prop=""` to bind an entire object to a single element when you just want to print it.
-- **Event handlers**: `res-onclick` handlers are looked up on `window`. If your handler accepts an argument, Resonant passes the current `item`.
-- **Quick removal**: For quick removal buttons, use `res-onclick-remove="idProp"` to delete by a unique key on each item.
-- **Computed properties**: Track dependencies automatically. Use plain variable names inside the function (e.g., `firstName`, `lastName`). They are read-only.
-- **Conditional expressions**: Keep display and style expressions simple and fast.
+### JavaScript
 
-### Performance Notes
-
-- Resonant selectively re-renders only changed array items by tracking indices and stable object keys
-- Deeply nested objects and arrays are proxied; nested edits still update only affected DOM segments
-
----
-
-## API & Attribute Reference
+| Method | Description |
+|---|---|
+| `new Resonant()` | Create an instance |
+| `.add(name, value?, persist?)` | Add a reactive variable. Omit `value` to bind an existing `window` variable. Pass `true` as second or third arg to persist to `localStorage`. |
+| `.addAll({ name: value, ... })` | Add multiple variables at once |
+| `.addCallback(name, fn)` | Listen for changes. `fn(currentValue, item, action)` |
+| `.computed(name, fn)` | Define a read-only derived value |
 
 ### HTML Attributes
 
-- `res` — bind a variable or array/template root
-- `res-prop` — bind an object property within a `res` context; empty value binds the whole item
-- `res-display` — boolean expression to show/hide element
-- `res-style` — expression returning a space-separated class string
-- `res-onclick` — call a global function; if it declares a parameter, it receives the current item
-- `res-onclick-remove` — remove from the parent array by matching the given property (e.g., `id`)
+| Attribute | Description |
+|---|---|
+| `res="varName"` | Bind element to a variable (scalar, object, or array template) |
+| `res-prop="key"` | Bind to an object property within a `res` context |
+| `res-display="expr"` | Show/hide element based on a JS expression |
+| `res-style="expr"` | Apply CSS classes from a JS expression |
+| `res-onclick="fnName"` | Call a global function on click; receives current item if in an array |
+| `res-onclick-remove="prop"` | Remove the current item from its parent array by matching property |
 
-### JavaScript API
+### Array Methods
 
-- `const resonant = new Resonant()`
-- `resonant.add(name, value, persist?)`
-- `resonant.addAll(objectMap)`
-- `resonant.addCallback(name, (newValue, item, action) => void)`
-- `resonant.computed(name, () => value)`
+Reactive arrays support all standard methods plus:
 
-### Array Helpers
-
-Reactive arrays include these methods:
-
-- `.push`, `.pop`, `.shift`, `.unshift`, `.splice`, `.sort`, `.reverse`
-- `.set(index, value)`, `.delete(index)`, `.update(array)`, `.filter(fn)`, `.filterInPlace(fn)`, `.forceUpdate()`
+| Method | Description |
+|---|---|
+| `.set(index, value)` | Update item at index |
+| `.delete(index)` | Remove item at index |
+| `.update(newArray)` | Replace entire array contents |
+| `.filterInPlace(fn)` | Mutating filter |
+| `.forceUpdate()` | Force re-render without changing data |
 
 ### Callback Actions
 
-- Scalars: `modified`
-- Arrays: `added`, `removed`, `modified`, `updated`, `filtered`
+`added` `removed` `modified` `updated` `filtered`
 
 ---
 
-## Key Features
+## Performance
 
-### Reactive Data Management
-
-```javascript
-const resonant = new Resonant();
-
-// Add single variables
-resonant.add('counter', 0);
-resonant.add('user', { name: 'John', age: 30 });
-
-// Batch initialization
-resonant.addAll({
-  tasks: [],
-  settings: { theme: 'light' },
-  currentUser: { name: 'Alice', role: 'admin' }
-});
-
-// Changes automatically update the UI
-user.name = 'Jane'; // DOM updates instantly
-tasks.push({ title: 'New task' }); // Array renders new item
-```
-
-### Callback System
-
-React to data changes with custom logic:
-
-```javascript
-resonant.addCallback('tasks', (newValue, item, action) => {
-  console.log(`Tasks ${action}:`, item);
-  updateTaskCounter();
-  saveToAPI();
-});
-
-resonant.addCallback('user', (newValue, item, action) => {
-  if (action === 'modified') {
-    showNotification('Profile updated');
-  }
-});
-```
-
-### LocalStorage Persistence
-
-Automatic localStorage integration:
-
-```javascript
-// Data persists across browser sessions
-resonant.add('userPreferences', { theme: 'dark' }, true);
-resonant.add('appState', { currentView: 'dashboard' }, true);
-
-// Changes are automatically saved
-userPreferences.theme = 'light'; // Saved to localStorage
-```
-
-### Computed Properties
-
-Reactive derived values that automatically recalculate:
-
-```javascript
-resonant.add('firstName', 'John');
-resonant.add('lastName', 'Doe');
-
-// Automatically updates when firstName or lastName changes
-resonant.computed('fullName', () => {
-  return firstName + ' ' + lastName;
-});
-
-// Cannot be set directly - read-only
-// fullName = 'Something'; // Will log warning and be ignored
-
-// Chain computed properties
-resonant.computed('greeting', () => {
-  return 'Hello, ' + fullName + '!';
-});
-```
-
-### Array Operations
-
-Full array reactivity with custom methods:
-
-```javascript
-// All operations trigger UI updates
-items.push(newItem);              // Add item
-items.splice(index, 1);           // Remove item
-items.update([...newItems]);      // Replace entire array
-items.set(index, newValue);       // Update specific index
-items.delete(index);              // Delete by index
-items.filter(v => v > 0);         // Non-mutating; still triggers a 'filtered' callback
-items.filterInPlace(fn);          // Mutating filter + rerender
-items.forceUpdate();              // Force a rerender without changing contents
-```
+- **Selective array re-rendering** -- when a property on one array item changes, only that item's DOM subtree is updated. Siblings are untouched, including their `res-display` and `res-style` evaluations.
+- **Batched updates** -- rapid changes within the same tick are coalesced into a single DOM update.
+- **Computed property chains** -- cascading computed properties resolve in dependency order within a single pass.
+- **Stable keys** -- array items are tracked by stable keys for efficient reuse during re-renders.
 
 ---
 
-## Real-World Examples
+## Browser Support
 
-### Todo List with Filtering
-
-```html
-<div>
-  <input res="newTask" placeholder="Add task..." />
-  <button onclick="addTask()">Add</button>
-  
-  <select res="filter">
-    <option value="all">All Tasks</option>
-    <option value="active">Active</option>
-    <option value="completed">Completed</option>
-  </select>
-  
-  <ul>
-    <li res="filteredTasks" 
-        res-display="filter === 'all' || (filter === 'active' && !completed) || (filter === 'completed' && completed)">
-      <input type="checkbox" res-prop="completed" />
-      <span res-prop="title" res-style="completed ? 'completed-task' : ''"></span>
-      <button res-onclick="deleteTask(item)">Delete</button>
-    </li>
-  </ul>
-</div>
-
-<script>
-const resonant = new Resonant();
-resonant.addAll({
-  tasks: [
-    { title: 'Learn ResonantJs', completed: false },
-    { title: 'Build awesome app', completed: false }
-  ],
-  newTask: '',
-  filter: 'all',
-  filteredTasks: []
-});
-
-function addTask() {
-  if (newTask.trim()) {
-    tasks.push({ title: newTask, completed: false });
-    newTask = '';
-    updateFilter();
-  }
-}
-
-function deleteTask(task) {
-  const index = tasks.indexOf(task);
-  tasks.splice(index, 1);
-  updateFilter();
-}
-
-function updateFilter() {
-  filteredTasks.splice(0);
-  tasks.forEach(task => filteredTasks.push(task));
-}
-
-resonant.addCallback('filter', updateFilter);
-resonant.addCallback('tasks', updateFilter);
-updateFilter();
-</script>
-```
-
-### Dashboard with Statistics
-
-```html
-<div class="dashboard">
-  <div class="stats">
-    <div class="stat-card">
-      <h3 res="stats.totalTasks"></h3>
-      <p>Total Tasks</p>
-    </div>
-    <div class="stat-card">
-      <h3 res="stats.completedTasks"></h3>
-      <p>Completed</p>
-    </div>
-    <div class="stat-card">
-      <h3 res="stats.completionRate"></h3>
-      <p>% Complete</p>
-    </div>
-  </div>
-  
-  <div class="projects">
-    <div res="projects">
-      <div res-prop="" class="project-card">
-        <h3 res-prop="name"></h3>
-        <div class="progress-bar">
-          <div class="progress" res-style="'width: ' + progress + '%'"></div>
-        </div>
-        <div res-prop="tasks">
-          <div res-prop="" res-style="'task priority-' + priority">
-            <span res-prop="title"></span>
-            <span res-prop="assignee"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-```
+Chrome 60+ / Firefox 55+ / Safari 12+ / Edge 79+ / Mobile browsers
 
 ---
 
-## Advanced Patterns
+## Examples
 
-### Nested Data Structures
-
-Handle complex, deeply nested data:
-
-```javascript
-resonant.add('company', {
-  departments: [
-    {
-      name: 'Engineering',
-      teams: [
-        {
-          name: 'Frontend',
-          members: [
-            { name: 'Alice', role: 'Senior Dev', skills: ['React', 'Vue'] },
-            { name: 'Bob', role: 'Junior Dev', skills: ['HTML', 'CSS'] }
-          ]
-        }
-      ]
-    }
-  ]
-});
-
-// All levels are reactive
-company.departments[0].teams[0].members[0].name = 'Alice Johnson';
-company.departments[0].teams[0].members.push(newMember);
-```
-
-### Computed Properties
-
-Create reactive calculated values that automatically update when dependencies change:
-
-```javascript
-const resonant = new Resonant();
-resonant.add('tasks', [
-  { title: 'Task 1', completed: true },
-  { title: 'Task 2', completed: false },
-  { title: 'Task 3', completed: true }
-]);
-
-// Computed properties automatically recalculate when 'tasks' changes
-resonant.computed('totalTasks', () => {
-  return tasks.length;
-});
-
-resonant.computed('completedTasks', () => {
-  return tasks.filter(t => t.completed).length;
-});
-
-resonant.computed('completionRate', () => {
-  return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-});
-
-// Shopping cart example
-resonant.add('items', [
-  { name: 'Widget', price: 10, quantity: 2 },
-  { name: 'Gadget', price: 15, quantity: 1 }
-]);
-resonant.add('taxRate', 0.08);
-
-resonant.computed('subtotal', () => {
-  return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-});
-
-resonant.computed('tax', () => {
-  return subtotal * taxRate;
-});
-
-resonant.computed('total', () => {
-  return subtotal + tax;
-});
-```
-
-```html
-<!-- These automatically update when items change -->
-<div>Subtotal: $<span res="subtotal"></span></div>
-<div>Tax: $<span res="tax"></span></div>
-<div>Total: $<span res="total"></span></div>
-```
-
-### Component-Like Patterns
-
-Organize code into reusable patterns:
-
-```javascript
-function createTaskManager(containerId) {
-  const resonant = new Resonant();
-  
-  resonant.addAll({
-    tasks: [],
-    filter: 'all',
-    newTask: ''
-  });
-  
-  resonant.addCallback('tasks', updateStats);
-  
-  return {
-    addTask: () => { /* implementation */ },
-    removeTask: (task) => { /* implementation */ },
-    setFilter: (filter) => { /* implementation */ }
-  };
-}
-```
+- [Basic Counter](./examples/example-basic.html)
+- [Task Manager](./examples/example-taskmanager.html)
+- [Nested Data (Houses)](./examples/example-houses.html)
+- [Tests Showcase](./examples/tests.html)
 
 ---
 
-## Examples & Demos
-
-Explore our comprehensive examples:
-
-- **[Basic Counter](./examples/example-basic.html)** - Simple reactive counter
-- **[Task Manager](./examples/example-taskmanager.html)** - Complete task management app
-- **[Houses Demo](./examples/example-houses.html)** - Complex nested data structures
-- **[Tests Showcase](./examples/tests.html)** - Interactive testbed used in CI
-
-Each example demonstrates different aspects of ResonantJs and can serve as starting points for your projects.
-
----
-
-## Performance & Browser Support
-
-### Performance
-
-- **Minimal overhead**: Only updates affected DOM elements
-- **Efficient diffing**: Smart change detection for nested objects
-- **Lazy evaluation**: Conditional expressions only run when dependencies change
-- **Memory efficient**: Automatic cleanup of unused observers
-
-### Browser Support
-
-- Chrome 60+
-- Firefox 55+
-- Safari 12+
-- Edge 79+
-- Mobile browsers (iOS Safari, Chrome Mobile)
-
----
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Setup
+## Development
 
 ```bash
 git clone https://github.com/amurgola/ResonantJs.git
 cd ResonantJs
 npm install
-npm test
-```
-
-### Running Tests
-
-```bash
-npm test                              # Run all tests
-npm test -- test/specific.test.js    # Run specific test file
+npm test          # run all tests
+npm run build     # run tests + minify
 ```
 
 ---
 
 ## License
 
-ResonantJs is released under the **MIT License**. See [LICENSE](LICENSE) file for details.
-
----
-
-## Support & Community
-
-- **Issues**: [GitHub Issues](https://github.com/amurgola/ResonantJs/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/amurgola/ResonantJs/discussions)
-- **Documentation**: [Full API Documentation](https://github.com/amurgola/ResonantJs/wiki)
+MIT -- see [LICENSE](LICENSE).
 
 ---
 
 <div align="center">
 
-**[Star us on GitHub](https://github.com/amurgola/ResonantJs)** • **[Try the Demo](./examples/example-taskmanager-simple-demo.html)** • **[Read the Docs](https://github.com/amurgola/ResonantJs/wiki)**
+**[GitHub](https://github.com/amurgola/ResonantJs)** · **[npm](https://www.npmjs.com/package/resonantjs)** · **[Issues](https://github.com/amurgola/ResonantJs/issues)**
 
-*Built with care by [Andrew Paul Murgola](https://github.com/amurgola)*
+*Built by [Andrew Paul Murgola](https://github.com/amurgola)*
 
 </div>

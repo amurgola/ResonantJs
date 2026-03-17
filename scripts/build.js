@@ -1,11 +1,18 @@
 const fs = require('fs');
+const path = require('path');
 const { minify } = require('terser');
 const { execSync } = require('child_process');
 
 async function runTests() {
   try {
     console.log('Running core tests...');
-    execSync('node --test test/resonant.test.js test/additional_features.test.js test/computed_properties.test.js', { stdio: 'inherit' });
+    const testDir = path.join(__dirname, '..', 'test');
+    const skipTests = new Set(['input_binding.test.js', 'error_handling.test.js', 'input_binding_advanced.test.js']);
+    const testFiles = fs.readdirSync(testDir)
+      .filter(f => f.endsWith('.test.js') && !skipTests.has(f))
+      .map(f => path.join('test', f))
+      .join(' ');
+    execSync(`node --test --test-force-exit --test-timeout=30000 ${testFiles}`, { stdio: 'inherit', timeout: 120000 });
     console.log('✓ Core tests passed');
   } catch (error) {
     console.error('✗ Core tests failed');

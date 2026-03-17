@@ -145,10 +145,11 @@ function createResonant() {
   
   const code = fs.readFileSync(path.join(__dirname, '..', 'resonant.js'), 'utf8');
   const document = new MockDocument();
-  const context = { 
-    console, 
-    setTimeout, 
-    clearTimeout, 
+  const context = {
+    console,
+    setTimeout,
+    clearTimeout,
+    structuredClone,
     document,
     window: null
   };

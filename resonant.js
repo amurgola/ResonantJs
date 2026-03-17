@@ -400,9 +400,22 @@
         }
 
         add(variableName, value, persist) {
+            if (arguments.length === 1 || (arguments.length === 2 && typeof value === 'boolean')) {
+                if (arguments.length === 2 && typeof value === 'boolean') {
+                    persist = value;
+                }
+                if (variableName in window) {
+                    value = structuredClone(window[variableName]);
+                    delete window[variableName];
+                } else {
+                    console.warn(`Resonant: "${variableName}" not found on window.`);
+                    return;
+                }
+            }
+
             value = this.persist(variableName, value, persist);
 
-            if (value.constructor.name === 'Response') {
+            if (value != null && value.constructor.name === 'Response') {
                 value.json().then(resolvedValue => {
                     this.add(variableName, resolvedValue, persist);
                 }).catch(err => {
@@ -435,7 +448,7 @@
 
         addAll(config) {
             Object.entries(config).forEach(([variableName, value]) => {
-                this.add(variableName, value);
+                this.add(variableName, value, false);
             });
         }
 
@@ -697,15 +710,24 @@
                         changedTokens.add(variableName);
                         if (u.path) changedTokens.add(`${variableName}.${u.path}`);
                     });
-                    Object.keys(this.computedDependencies).forEach(computedName => {
-                        const deps = this.computedDependencies[computedName];
-                        for (const tok of changedTokens) {
-                            if (deps.has(tok) || deps.has(variableName)) {
-                                this._recomputeProperty(computedName);
-                                break;
+                    let recomputedAny = true;
+                    while (recomputedAny) {
+                        recomputedAny = false;
+                        Object.keys(this.computedDependencies).forEach(computedName => {
+                            const deps = this.computedDependencies[computedName];
+                            for (const tok of changedTokens) {
+                                if (deps.has(tok) || deps.has(variableName)) {
+                                    const oldVal = this.data[computedName];
+                                    this._recomputeProperty(computedName);
+                                    if (this.data[computedName] !== oldVal) {
+                                        changedTokens.add(computedName);
+                                        recomputedAny = true;
+                                    }
+                                    break;
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
 
                     this.updateElement(variableName);
                     this.updateDisplayConditionalsFor(variableName);
@@ -750,8 +772,6 @@
                 }
                 else if (Array.isArray(boundValue)) {
                     if (element.getAttribute('res-rendered') === 'true') return;
-                    const existingRendered = element.querySelectorAll(`[res="${resAttr}"][res-rendered="true"]`);
-                    existingRendered.forEach(el => el.remove());
                     this._renderArray(resAttr, element);
                 }
                 else if (isObject(boundValue)) {
@@ -920,8 +940,10 @@
                     });
                 }
 
-                this._handleDisplayElements(elementToUse, instance, variablePath);
-                this._bindClickEvents(elementToUse, instance, arrayValue);
+                if (!shouldReuse) {
+                    this._handleDisplayElements(elementToUse, instance, variablePath);
+                    this._bindClickEvents(elementToUse, instance, arrayValue);
+                }
 
                 container.appendChild(elementToUse);
             });
@@ -999,11 +1021,27 @@
                 this._evaluateDisplayCondition(conditionalElement, instance ?? this.data[variableName], condition, variableName);
             });
 
-            const contextElements = document.querySelectorAll(`[res="${variableName}"] [res-display]`);
-            contextElements.forEach(conditionalElement => {
-                const condition = conditionalElement.getAttribute('res-display');
-                this._evaluateDisplayCondition(conditionalElement, this.data[variableName], condition, variableName);
-            });
+            const bound = this.data[variableName];
+            if (Array.isArray(bound)) {
+                const changedIndices = this._changedArrayIndices[variableName];
+                const renderedItems = document.querySelectorAll(`[res="${variableName}"][res-rendered="true"]`);
+                renderedItems.forEach(renderedItem => {
+                    const idx = renderedItem.getAttribute('res-index');
+                    if (changedIndices && idx !== null && idx !== undefined && !changedIndices.has(Number(idx))) return;
+                    const displayEls = renderedItem.querySelectorAll('[res-display]');
+                    displayEls.forEach(conditionalElement => {
+                        const condition = conditionalElement.getAttribute('res-display');
+                        const instance = idx !== null && idx !== undefined ? bound[Number(idx)] : bound;
+                        this._evaluateDisplayCondition(conditionalElement, instance, condition, variableName);
+                    });
+                });
+            } else {
+                const contextElements = document.querySelectorAll(`[res="${variableName}"] [res-display]`);
+                contextElements.forEach(conditionalElement => {
+                    const condition = conditionalElement.getAttribute('res-display');
+                    this._evaluateDisplayCondition(conditionalElement, bound, condition, variableName);
+                });
+            }
         }
 
         updateStylesFor(variableName) {
