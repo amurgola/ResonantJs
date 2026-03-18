@@ -149,7 +149,7 @@ function createResonant() {
     console,
     setTimeout,
     clearTimeout,
-    structuredClone,
+    structuredClone: typeof structuredClone === 'function' ? structuredClone : (obj) => JSON.parse(JSON.stringify(obj)),
     document,
     window: null
   };

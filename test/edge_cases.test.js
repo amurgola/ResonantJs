@@ -35,12 +35,10 @@ function createResonant() {
 // in the VM test context (separate event loops). These features work in real usage
 // but require integration tests in a browser environment.
 
-test.skip('add with resolved Promise adds data correctly', async () => {
-  // Skipped: VM context event loop limitation
+test('add with resolved Promise adds data correctly', { skip: 'VM context event loop limitation' }, async () => {
 });
 
-test.skip('add with rejected Promise handles error gracefully', async () => {
-  // Skipped: VM context event loop limitation
+test('add with rejected Promise handles error gracefully', { skip: 'VM context event loop limitation' }, async () => {
 });
 
 test.skip('add with Promise resolving to array', async () => {
