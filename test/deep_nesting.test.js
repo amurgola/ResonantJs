@@ -7,7 +7,7 @@ const { MockElement, MockDocument } = require('./mockDom');
 
 function createResonant() {
   const code = fs.readFileSync(path.join(__dirname, '..', 'resonant.js'), 'utf8');
-  const context = { console, setTimeout, clearTimeout };
+  const context = { console, setTimeout, clearTimeout, structuredClone: typeof structuredClone === 'function' ? structuredClone : (obj) => JSON.parse(JSON.stringify(obj)) };
   context.window = context;
   context.document = { querySelectorAll: () => [] };
 
@@ -26,7 +26,7 @@ function createResonant() {
 
 function createResonantDom(root) {
   const code = fs.readFileSync(path.join(__dirname, '..', 'resonant.js'), 'utf8');
-  const context = { console, setTimeout, clearTimeout };
+  const context = { console, setTimeout, clearTimeout, structuredClone: typeof structuredClone === 'function' ? structuredClone : (obj) => JSON.parse(JSON.stringify(obj)) };
   context.window = context;
   context.document = new MockDocument(root);
   const store = {};
