@@ -41,8 +41,7 @@ test('add with resolved Promise adds data correctly', { skip: 'VM context event 
 test('add with rejected Promise handles error gracefully', { skip: 'VM context event loop limitation' }, async () => {
 });
 
-test.skip('add with Promise resolving to array', async () => {
-  // Skipped: VM context event loop limitation
+test('add with Promise resolving to array', { skip: 'VM context event loop limitation' }, async () => {
 });
 
 test('add with fetch Response resolves JSON correctly', async () => {
@@ -93,8 +92,7 @@ test('add with fetch Response json() rejection handles error', async () => {
   console.error = originalError;
 });
 
-test.skip('add with nested Promise (Promise that resolves to object with data)', async () => {
-  // Skipped: VM context event loop limitation
+test('add with nested Promise (Promise that resolves to object with data)', { skip: 'VM context event loop limitation' }, async () => {
 });
 
 // ============================================
