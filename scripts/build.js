@@ -12,7 +12,7 @@ async function runTests() {
       .filter(f => f.endsWith('.test.js') && !skipTests.has(f))
       .map(f => path.join('test', f))
       .join(' ');
-    execSync(`node --test --test-force-exit --test-timeout=30000 ${testFiles}`, { stdio: 'inherit', timeout: 120000 });
+    execSync(`node --test ${testFiles}`, { stdio: 'inherit', timeout: 120000 });
     console.log('✓ Core tests passed');
   } catch (error) {
     console.error('✗ Core tests failed');
