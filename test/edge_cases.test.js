@@ -6,7 +6,8 @@ const path = require('path');
 
 function createResonant() {
   const code = fs.readFileSync(path.join(__dirname, '..', 'resonant.js'), 'utf8');
-  const context = { console, setTimeout, clearTimeout, structuredClone: typeof structuredClone === 'function' ? structuredClone : (obj) => JSON.parse(JSON.stringify(obj)) };
+  const wrappedSetTimeout = (fn, ms, ...args) => { const t = setTimeout(fn, ms, ...args); if (t && t.unref) t.unref(); return t; };
+  const context = { console, setTimeout: wrappedSetTimeout, clearTimeout, structuredClone: typeof structuredClone === 'function' ? structuredClone : (obj) => JSON.parse(JSON.stringify(obj)) };
   context.window = context;
   context.document = { querySelectorAll: () => [] };
 
