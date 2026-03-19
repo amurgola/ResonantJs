@@ -299,7 +299,11 @@
     }
 
     class Resonant {
-        constructor() {
+        constructor(options = {}) {
+            this.config = {
+                bindToWindow: options.bindToWindow !== false,
+                rootElement: options.rootElement || document
+            };
             this.data = {};
             this.callbacks = {};
             this.pendingUpdates = new Map();
@@ -335,7 +339,8 @@
         _setByPath(variableName, value) {
             const { root, path } = this._getRootAndPath(variableName);
             if (!path) {
-                window[root] = value;
+                const target = this.config.bindToWindow ? window : this;
+                target[root] = value;
                 return;
             }
             let cur = this.data[root];
@@ -429,7 +434,7 @@
                 }
                 if (variableName in window) {
                     value = structuredClone(window[variableName]);
-                    delete window[variableName];
+                    if (this.config.bindToWindow) delete window[variableName];
                 } else {
                     console.warn(`Resonant: "${variableName}" not found on window.`);
                     return;
@@ -667,7 +672,8 @@
         }
 
         _defineProperty(variableName) {
-            Object.defineProperty(window, variableName, {
+            const target = this.config.bindToWindow ? window : this;
+            Object.defineProperty(target, variableName, {
                 configurable: true,
                 get: () => {
                     this._captureAccess(variableName);
@@ -773,8 +779,9 @@
                 this.callbacks[variableName].forEach(callback => {
                     const item = callbackData.item || callbackData.oldValue;
                     try {
-                        const currentValue = (typeof window !== 'undefined' && window[variableName] !== undefined)
-                            ? window[variableName]
+                        const t = this.config.bindToWindow ? window : this;
+                        const currentValue = (typeof t !== 'undefined' && t[variableName] !== undefined)
+                            ? t[variableName]
                             : this.data[variableName];
                         callback(currentValue, item, callbackData.action);
                     } catch (e) {
@@ -786,7 +793,7 @@
 
         updateElement(variableName) {
             const { root } = this._getRootAndPath(variableName);
-            const elements = document.querySelectorAll(`[res="${root}"], [res^="${root}."]`);
+            const elements = this.config.rootElement.querySelectorAll(`[res="${root}"], [res^="${root}."]`);
             elements.forEach(element => {
                 const resAttr = element.getAttribute('res');
                 const boundValue = this._getByPath(resAttr);
@@ -812,7 +819,11 @@
                     });
                 }
                 else {
-                    element.innerHTML = boundValue ?? '';
+                    if (element.hasAttribute('res-html')) {
+                        element.innerHTML = boundValue ?? '';
+                    } else {
+                        element.textContent = boundValue ?? '';
+                    }
                 }
             });
 
@@ -854,7 +865,11 @@
                 });
             }
             else {
-                subEl.innerHTML = propValue ?? '';
+                if (subEl.hasAttribute('res-html')) {
+                    subEl.innerHTML = propValue ?? '';
+                } else {
+                    subEl.textContent = propValue ?? '';
+                }
             }
         }
 
@@ -908,9 +923,17 @@
                     if (!isObject(instance)) {
                         const anyPlace = elementToUse.querySelector('[res-prop=""]');
                         if (anyPlace) {
-                            anyPlace.innerHTML = String(instance);
+                            if (anyPlace.hasAttribute('res-html')) {
+                                anyPlace.innerHTML = String(instance);
+                            } else {
+                                anyPlace.textContent = String(instance);
+                            }
                         } else {
-                            elementToUse.innerHTML = String(instance);
+                            if (elementToUse.hasAttribute('res-html')) {
+                                elementToUse.innerHTML = String(instance);
+                            } else {
+                                elementToUse.textContent = String(instance);
+                            }
                         }
                     } else {
                         const keys = Object.keys(instance);
@@ -938,7 +961,11 @@
                                     );
                                 }
                                 else if (!Array.isArray(value) && !isObject(value)) {
-                                    subEl.innerHTML = value ?? '';
+                                    if (subEl.hasAttribute('res-html')) {
+                                        subEl.innerHTML = value ?? '';
+                                    } else {
+                                        subEl.textContent = value ?? '';
+                                    }
                                 }
                             }
                         });
@@ -1001,7 +1028,11 @@
                 cloned.setAttribute('res-index', idx);
 
                 if (item !== null && !isObject(item)) {
-                    cloned.innerHTML = item;
+                    if (cloned.hasAttribute('res-html')) {
+                        cloned.innerHTML = item;
+                    } else {
+                        cloned.textContent = item;
+                    }
                 } else {
                     const nestedEls = cloned.querySelectorAll('[res-prop]');
                     nestedEls.forEach(nestedEl => {
@@ -1026,7 +1057,7 @@
         }
 
         updateDisplayConditionalsFor(variableName) {
-            const conditionalElements = document.querySelectorAll(`[res-display*="${variableName}"]`);
+            const conditionalElements = this.config.rootElement.querySelectorAll(`[res-display*="${variableName}"]`);
             conditionalElements.forEach(conditionalElement => {
                 const condition = conditionalElement.getAttribute('res-display');
 
@@ -1053,7 +1084,7 @@
             const bound = this.data[variableName];
             if (Array.isArray(bound)) {
                 const changedIndices = this._changedArrayIndices[variableName];
-                const renderedItems = document.querySelectorAll(`[res="${variableName}"][res-rendered="true"]`);
+                const renderedItems = this.config.rootElement.querySelectorAll(`[res="${variableName}"][res-rendered="true"]`);
                 renderedItems.forEach(renderedItem => {
                     const idx = renderedItem.getAttribute('res-index');
                     if (changedIndices && idx !== null && idx !== undefined && !changedIndices.has(Number(idx))) return;
@@ -1065,7 +1096,7 @@
                     });
                 });
             } else {
-                const contextElements = document.querySelectorAll(`[res="${variableName}"] [res-display]`);
+                const contextElements = this.config.rootElement.querySelectorAll(`[res="${variableName}"] [res-display]`);
                 contextElements.forEach(conditionalElement => {
                     const condition = conditionalElement.getAttribute('res-display');
                     this._evaluateDisplayCondition(conditionalElement, bound, condition, variableName);
@@ -1074,7 +1105,7 @@
         }
 
         updateStylesFor(variableName) {
-            const styleElements = document.querySelectorAll(`[res-style*="${variableName}"]`);
+            const styleElements = this.config.rootElement.querySelectorAll(`[res-style*="${variableName}"]`);
             styleElements.forEach(styleElement => {
                 let styleCondition = styleElement.getAttribute('res-style');
                 try {
@@ -1150,13 +1181,17 @@
                     : String(value);
             selectors.forEach(selector => {
                 try {
-                    const elements = document.querySelectorAll(selector);
+                    const elements = this.config.rootElement.querySelectorAll(selector);
                     elements.forEach(el => {
                         const tag = el.tagName;
                         if (tag === 'INPUT' || tag === 'TEXTAREA') {
                             el.value = displayValue;
                         } else {
-                            el.innerHTML = displayValue;
+                            if (el.hasAttribute('res-html')) {
+                                el.innerHTML = displayValue;
+                            } else {
+                                el.textContent = displayValue;
+                            }
                         }
                     });
                 } catch (_) {}

@@ -47,6 +47,19 @@ class MockElement {
     }
   }
 
+  get textContent() {
+    return this._innerHTML;
+  }
+
+  set textContent(value) {
+    const stringValue = value == null ? '' : String(value);
+    if (this._innerHTML !== stringValue) {
+      this._innerHTML = stringValue;
+      this._renderCount++;
+      this._lastRenderTime = Date.now();
+    }
+  }
+
   resetRenderTracking() {
     this._renderCount = 0;
     this._lastRenderTime = 0;

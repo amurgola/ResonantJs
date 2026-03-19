@@ -171,6 +171,52 @@ res.addCallback('tasks', (value, item, action) => {
 });
 ```
 
+### Bind by CSS Selector
+
+Push reactive values into arbitrary DOM elements without adding `res` attributes. Useful when you can't modify the target HTML — third-party widgets, CMS-rendered markup, or elements loaded later via AJAX.
+
+```js
+res.add('score', 0);
+
+// Any element matching the selector will be updated when `score` changes
+score.bindByCssSelector('.score-display');
+
+// Works from the instance too (required for scalar values like strings/numbers)
+res.bindByCssSelector('score', '.score-display');
+```
+
+```html
+<!-- These elements don't need res="score" -->
+<span class="score-display"></span>
+<div class="score-display"></div>
+```
+
+**Key behaviour:**
+
+- **One-way binding** — data flows from the variable to the matched elements. User input on those elements does not flow back.
+- **Full DOM re-query every update** — the selector is evaluated against the entire DOM (or `rootElement` if configured) on every change, so elements added dynamically after the binding is registered will be picked up automatically.
+- **Silent when no match** — if no elements match the selector, the update is silently skipped. No errors, no warnings.
+- **Multiple selectors** — call `bindByCssSelector` more than once to push the same value to different selectors.
+- **INPUT / TEXTAREA** — matched input elements have their `.value` set instead of their text content.
+- Objects and arrays are serialised as JSON. Scalars are converted to strings.
+
+```js
+// Bind an object — multiple selectors
+res.add('user', { name: 'Alice', role: 'admin' });
+user.bindByCssSelector('.user-json');
+user.bindByCssSelector('#sidebar-user');
+
+// Bind an array
+res.add('items', [1, 2, 3]);
+items.bindByCssSelector('.item-list'); // renders "[1,2,3]"
+
+// Scalar — use the instance method since primitives can't have methods
+res.add('greeting', 'Hello');
+res.bindByCssSelector('greeting', '.welcome-banner');
+```
+
+> **Performance note:** Because `bindByCssSelector` re-queries the DOM on every update, it is inherently less performant than `res` attribute bindings. Use it for convenience when the target markup is outside your control; prefer `res` attributes for performance-critical paths.
+
 ---
 
 ## Build a Todo App
@@ -237,6 +283,7 @@ Copy this into an `.html` file and open it in your browser.
 | `.addAll({ name: value, ... })` | Add multiple variables at once |
 | `.addCallback(name, fn)` | Listen for changes. `fn(currentValue, item, action)` |
 | `.computed(name, fn)` | Define a read-only derived value |
+| `.bindByCssSelector(name, selector)` | One-way bind a variable to all elements matching a CSS selector. Also available as `myVar.bindByCssSelector(selector)` on objects and arrays. |
 
 ### HTML Attributes
 
