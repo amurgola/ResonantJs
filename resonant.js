@@ -36,15 +36,18 @@
             }
         }
 
-        static _ensureKeysRecursive(value, resonant) {
+        static _ensureKeysRecursive(value, resonant, _seen) {
             if (!isObject(value)) return value;
+            if (!_seen) _seen = new Set();
+            if (_seen.has(value)) return value;
+            _seen.add(value);
             if (Array.isArray(value)) {
-                value.forEach(v => ObservableArray._ensureKeysRecursive(v, resonant));
+                value.forEach(v => ObservableArray._ensureKeysRecursive(v, resonant, _seen));
                 return value;
             }
             ObservableArray._ensureKey(value, resonant);
             Object.keys(value).forEach(k => {
-                ObservableArray._ensureKeysRecursive(value[k], resonant);
+                ObservableArray._ensureKeysRecursive(value[k], resonant, _seen);
             });
             return value;
         }
@@ -94,6 +97,9 @@
             const handler = {
                 get(t, prop, receiver) {
                     if (prop === PROXY_FLAG) return true;
+                    if (prop === 'bindByCssSelector') {
+                        return (cssSelector) => resonant.bindByCssSelector(rootName, cssSelector);
+                    }
                     if (prop === 'length') return Reflect.get(t, prop, receiver);
 
                     if (prop === 'set') {
@@ -303,6 +309,7 @@
             this._currentComputed = null;
             this._nextKeyId = 1;
             this._changedArrayIndices = {};
+            this.cssSelectorBindings = {};
         }
 
         _splitPath(path) {
@@ -344,12 +351,28 @@
         }
 
         _handleInputElement(element, value, onChangeCallback) {
+            const tag = element.tagName;
             const type = (element.type || '').toLowerCase();
             if (type === 'checkbox') {
                 const b = !!value;
                 if (element.checked !== b) element.checked = b;
                 if (!element.hasAttribute('data-resonant-bound')) {
                     element.onchange = () => onChangeCallback(!!element.checked);
+                    element.setAttribute('data-resonant-bound', 'true');
+                }
+            } else if (type === 'radio') {
+                element.checked = (element.value === String(value));
+                if (!element.hasAttribute('data-resonant-bound')) {
+                    element.onchange = () => {
+                        if (element.checked) onChangeCallback(element.value);
+                    };
+                    element.setAttribute('data-resonant-bound', 'true');
+                }
+            } else if (tag === 'SELECT') {
+                const v = value ?? '';
+                if (element.value !== String(v)) element.value = v;
+                if (!element.hasAttribute('data-resonant-bound')) {
+                    element.onchange = () => onChangeCallback(element.value);
                     element.setAttribute('data-resonant-bound', 'true');
                 }
             } else if (type === 'number' || type === 'range') {
@@ -400,7 +423,7 @@
         }
 
         add(variableName, value, persist) {
-            if (arguments.length === 1 || (arguments.length === 2 && typeof value === 'boolean')) {
+            if (arguments.length === 1 || (arguments.length === 2 && typeof value === 'boolean' && variableName in window)) {
                 if (arguments.length === 2 && typeof value === 'boolean') {
                     persist = value;
                 }
@@ -512,6 +535,9 @@
                 const handler = {
                     get(target, property, receiver) {
                         if (property === PROXY_FLAG) return true;
+                        if (property === 'bindByCssSelector') {
+                            return (cssSelector) => self.bindByCssSelector(rootVarName, cssSelector);
+                        }
                         if (self._currentComputed && typeof property !== 'symbol') {
                             const token = path ? `${rootVarName}.${path}.${String(property)}` : `${rootVarName}.${String(property)}`;
                             self._captureAccess(rootVarName);
@@ -664,6 +690,7 @@
                     this.updateElement(variableName);
                     this.updateDisplayConditionalsFor(variableName);
                     this.updateStylesFor(variableName);
+                    this._updateCssSelectorBindings(variableName);
 
                     if (!Array.isArray(newValue) && !isObject(newValue)) {
                         this._queueUpdate(variableName, 'modified', this.data[variableName]);
@@ -732,6 +759,7 @@
                     this.updateElement(variableName);
                     this.updateDisplayConditionalsFor(variableName);
                     this.updateStylesFor(variableName);
+                    this._updateCssSelectorBindings(variableName);
 
                     if (this._changedArrayIndices[variableName]) {
                         delete this._changedArrayIndices[variableName];
@@ -763,7 +791,7 @@
                 const resAttr = element.getAttribute('res');
                 const boundValue = this._getByPath(resAttr);
 
-                if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+                if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.tagName === 'SELECT') {
                     this._handleInputElement(element, boundValue, (newValue) => {
                         this._setByPath(resAttr, newValue);
                         const { root: root2, path } = this._getRootAndPath(resAttr);
@@ -790,6 +818,7 @@
 
             this.updateDisplayConditionalsFor(variableName);
             this.updateStylesFor(variableName);
+            this._updateCssSelectorBindings(variableName);
         }
 
         _renderObjectProperty(subEl, propValue, parentVarName, key) {
@@ -1100,6 +1129,38 @@
                 this.callbacks[variableName] = [];
             }
             this.callbacks[variableName].push(method);
+        }
+
+        bindByCssSelector(variableName, cssSelector) {
+            if (!this.cssSelectorBindings[variableName]) {
+                this.cssSelectorBindings[variableName] = new Set();
+            }
+            this.cssSelectorBindings[variableName].add(cssSelector);
+            this._updateCssSelectorBindings(variableName);
+        }
+
+        _updateCssSelectorBindings(variableName) {
+            const selectors = this.cssSelectorBindings[variableName];
+            if (!selectors || selectors.size === 0) return;
+            const value = this.data[variableName];
+            const displayValue = (value === null || value === undefined)
+                ? ''
+                : (isObject(value) || Array.isArray(value))
+                    ? JSON.stringify(value)
+                    : String(value);
+            selectors.forEach(selector => {
+                try {
+                    const elements = document.querySelectorAll(selector);
+                    elements.forEach(el => {
+                        const tag = el.tagName;
+                        if (tag === 'INPUT' || tag === 'TEXTAREA') {
+                            el.value = displayValue;
+                        } else {
+                            el.innerHTML = displayValue;
+                        }
+                    });
+                } catch (_) {}
+            });
         }
     }
 

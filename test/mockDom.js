@@ -12,8 +12,26 @@ class MockElement {
     };
     this.parentElement = null;
     this._innerHTML = '';
+    this._value = '';
+    this._checked = false;
     this._renderCount = 0;
     this._lastRenderTime = 0;
+  }
+
+  get value() {
+    return this._value;
+  }
+
+  set value(v) {
+    this._value = v == null ? '' : String(v);
+  }
+
+  get checked() {
+    return this._checked;
+  }
+
+  set checked(v) {
+    this._checked = !!v;
   }
 
   get innerHTML() {
@@ -103,11 +121,27 @@ function querySelectorAllInternal(root, selector) {
     return res;
   }
   const conds = [];
+  const requiredClasses = [];
+  const requiredTag = [];
+
+  // Extract class selectors (.className)
+  let remaining = selector;
+  remaining = remaining.replace(/\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g, (_, cls) => {
+    requiredClasses.push(cls);
+    return '';
+  });
+
+  // Extract tag selectors
+  remaining = remaining.replace(/^([a-zA-Z][a-zA-Z0-9]*)/g, (_, tag) => {
+    requiredTag.push(tag.toUpperCase());
+    return '';
+  });
+
   const regex = /\[([^\]]+)\]/g;
   let m;
-  while ((m = regex.exec(selector)) !== null) {
+  while ((m = regex.exec(remaining)) !== null) {
     const expr = m[1].trim();
-    const match = expr.match(/^([^*~=]+)(\*=|=)?"?([^"]*)"?$/);
+    const match = expr.match(/^([^*~^$=]+)(\^=|\*=|=)?"?([^"]*)"?$/);
     if (match) {
       const name = match[1];
       const op = match[2] || null;
@@ -119,17 +153,29 @@ function querySelectorAllInternal(root, selector) {
   (function traverse(node){
     if (node instanceof MockElement) {
       let ok = true;
-      for (const c of conds) {
-        const val = node.getAttribute(c.name);
-        if (c.op === null) {
-          if (val === undefined) { ok = false; break; }
-        } else if (c.op === '=') {
-          if (val !== c.value) { ok = false; break; }
-        } else if (c.op === '*=') {
-          if (!val || !val.includes(c.value)) { ok = false; break; }
+      for (const cls of requiredClasses) {
+        if (!node.classList.contains(cls)) { ok = false; break; }
+      }
+      if (ok) {
+        for (const tag of requiredTag) {
+          if (node.tagName !== tag) { ok = false; break; }
         }
       }
-      if (ok) out.push(node);
+      if (ok) {
+        for (const c of conds) {
+          const val = node.getAttribute(c.name);
+          if (c.op === null) {
+            if (val === undefined) { ok = false; break; }
+          } else if (c.op === '=') {
+            if (val !== c.value) { ok = false; break; }
+          } else if (c.op === '*=') {
+            if (!val || !val.includes(c.value)) { ok = false; break; }
+          } else if (c.op === '^=') {
+            if (!val || !val.startsWith(c.value)) { ok = false; break; }
+          }
+        }
+      }
+      if (ok && (conds.length > 0 || requiredClasses.length > 0 || requiredTag.length > 0)) out.push(node);
     }
     if (node && node.children) {
       node.children.forEach(ch => traverse(ch));
