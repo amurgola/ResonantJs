@@ -16,9 +16,10 @@
     const tick = () => new Promise((r) => setTimeout(r, 0));
     const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
-    // Array templates are cached on window as <variable>_template, so a
-    // second run of a scenario would otherwise reuse a template from a root
-    // that no longer exists.
+    // Versions before 1.3.1 cached array templates on window as
+    // <variable>_template, so when an older build is benchmarked (--against) a
+    // second run of a scenario would reuse a template from a root that no
+    // longer exists. Current builds cache on the element; this is a no-op there.
     function clearTemplateCache() {
         Object.keys(window).filter((key) => key.endsWith('_template')).forEach((key) => { delete window[key]; });
     }

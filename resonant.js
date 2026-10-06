@@ -3,6 +3,53 @@
     const OBJECT_KEY = new WeakMap();
     // DOM events bindable via res-on<event> (e.g. res-oninput, res-onkeydown).
     const _RES_EVENTS = ['click', 'dblclick', 'input', 'change', 'keydown', 'keyup', 'keypress', 'submit', 'blur', 'focus', 'mousedown', 'mouseup'];
+    const _RES_EVENT_SELECTOR = _RES_EVENTS.map(ev => '[res-on' + ev + ']').join(',');
+
+    // res-display / res-style expressions are compiled once per distinct
+    // (parameter list, source) pair and reused for every element that carries
+    // them. A 1,000-item list evaluates the same expression 1,000 times; without
+    // this cache each evaluation paid for a fresh `new Function` compile.
+    const COMPILED_EXPRESSIONS = new Map();
+    function compileExpression(params, source) {
+        const key = params.join(',') + '\u0000' + source;
+        let fn = COMPILED_EXPRESSIONS.get(key);
+        if (!fn) {
+            if (COMPILED_EXPRESSIONS.size >= 5000) COMPILED_EXPRESSIONS.clear();
+            fn = new Function(...params, `return (${source});`);
+            COMPILED_EXPRESSIONS.set(key, fn);
+        }
+        return fn;
+    }
+
+    // Identifier tokens of an expression, cached per source string.
+    const EXPRESSION_TOKENS = new Map();
+    function tokensOf(source) {
+        let tokens = EXPRESSION_TOKENS.get(source);
+        if (!tokens) {
+            tokens = source.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
+            EXPRESSION_TOKENS.set(source, tokens);
+        }
+        return tokens;
+    }
+
+    // The per-item rewrite of a res-display expression (root -> item, own
+    // properties -> item.prop) depends only on the expression, the root name
+    // and which tokens the item owns, so it is cached on that key.
+    const REWRITTEN_EXPRESSIONS = new Map();
+    function rewriteForItem(source, root, instance) {
+        const owned = tokensOf(source).filter(tok =>
+            tok !== 'item' && tok !== 'true' && tok !== 'false' && tok !== 'null' && tok !== 'undefined' &&
+            Object.prototype.hasOwnProperty.call(instance, tok));
+        const key = root + '\u0000' + owned.join(',') + '\u0000' + source;
+        let expr = REWRITTEN_EXPRESSIONS.get(key);
+        if (expr === undefined) {
+            expr = source.replace(new RegExp(`\\b${root}\\b`, 'g'), 'item');
+            owned.forEach(tok => { expr = expr.replace(new RegExp(`\\b${tok}\\b`, 'g'), `item.${tok}`); });
+            if (REWRITTEN_EXPRESSIONS.size >= 5000) REWRITTEN_EXPRESSIONS.clear();
+            REWRITTEN_EXPRESSIONS.set(key, expr);
+        }
+        return expr;
+    }
 
     function isObject(val) {
         return val !== null && typeof val === 'object';
@@ -224,10 +271,12 @@
                         },
                         sort: (cmp) => {
                             Array.prototype.sort.call(t, cmp);
+                            notifyUpdated();
                             return receiver;
                         },
                         reverse: () => {
                             Array.prototype.reverse.call(t);
+                            notifyUpdated();
                             return receiver;
                         },
                         filter: (fn, actuallyFilter = true) => {
@@ -316,6 +365,7 @@
             this._nextKeyId = 1;
             this._changedArrayIndices = {};
             this.cssSelectorBindings = {};
+            this._rootAndPathCache = new Map();
             // Render transforms: variableName -> fn(value, { done }) => html.
             // Used by updateElement's scalar branch AND the stream flush.
             this._formatters = {};
@@ -336,9 +386,17 @@
             return path.split('.').filter(Boolean);
         }
         _getRootAndPath(variableName) {
-            const parts = this._splitPath(variableName);
-            const root = parts.shift() || variableName;
-            return { root, path: parts.join('.') };
+            // Called for every bound element on every render; memoized since
+            // the same handful of paths recur thousands of times.
+            let entry = this._rootAndPathCache.get(variableName);
+            if (!entry) {
+                const parts = this._splitPath(variableName);
+                const root = parts.shift() || variableName;
+                entry = { root, path: parts.join('.') };
+                if (this._rootAndPathCache.size >= 2000) this._rootAndPathCache.clear();
+                this._rootAndPathCache.set(variableName, entry);
+            }
+            return entry;
         }
         _getByPath(variableName) {
             const { root, path } = this._getRootAndPath(variableName);
@@ -636,27 +694,15 @@
                 let expr = condition || '';
                 let show = false;
 
-                if (variableName) {
+                if (variableName && instance && isObject(instance)) {
                     const { root } = this._getRootAndPath(variableName);
-                    if (instance && isObject(instance)) {
-                        const rootPattern = new RegExp(`\\b${root}\\b`, 'g');
-                        expr = expr.replace(rootPattern, 'item');
-
-                        const tokens = expr.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
-                        tokens.forEach(tok => {
-                            if (tok === 'item' || tok === 'true' || tok === 'false' || tok === 'null' || tok === 'undefined') return;
-                            if (Object.prototype.hasOwnProperty.call(instance, tok)) {
-                                const rx = new RegExp(`\\b${tok}\\b`, 'g');
-                                expr = expr.replace(rx, `item.${tok}`);
-                            }
-                        });
-                    }
+                    expr = rewriteForItem(expr, root, instance);
                 }
 
                 try {
-                    show = !!(new Function('item', 'state', `return (${expr});`))(instance, this.data);
+                    show = !!compileExpression(['item', 'state'], expr)(instance, this.data);
                 } catch (e) {
-                    show = !!(new Function(`return (${condition});`))();
+                    show = !!compileExpression([], condition)();
                 }
 
                 element.style.display = show ? 'inherit' : 'none';
@@ -693,10 +739,10 @@
                     const keys = (instance && isObject(instance))
                         ? Object.keys(instance).filter(k => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k))
                         : [];
-                    const fn = new Function(...keys, 'item', 'state', `return (${condition});`);
+                    const fn = compileExpression([...keys, 'item', 'state'], condition);
                     styleClass = fn(...keys.map(k => instance[k]), instance, this.data);
                 } catch (e) {
-                    styleClass = (new Function(`return (${condition});`))();
+                    styleClass = compileExpression([], condition)();
                 }
                 if (typeof styleClass === 'string' && styleClass.trim()) {
                     styleClass.split(/\s+/).forEach(cls => styleElement.classList.add(cls));
@@ -722,20 +768,33 @@
         // resolve the same way as res-onclick (baked window fn | injected res.X
         // | per-mount res-on: override) and fire as fn(item, event).
         _bindEvents(parentElement, instance, arrayValue, overrides) {
-            _RES_EVENTS.forEach(ev => {
-                const attr = 'res-on' + ev;
-                parentElement.querySelectorAll('[' + attr + ']').forEach(elx => {
-                    const name = elx.getAttribute(attr);
-                    elx['on' + ev] = (event) => {
-                        const fn = this._resolveHandler(name, overrides);
-                        if (typeof fn === 'function') {
-                            try { fn(instance, event); }
-                            catch (e) { console.error('Resonant: ' + ev + ' handler error for', name, e); }
-                        } else {
-                            console.warn('Resonant: ' + ev + ' handler not found:', name);
-                        }
-                    };
-                });
+            // One subtree query for every res-on* attribute, then bind from
+            // each element's own attribute list (a handful of names) instead
+            // of probing all twelve event attributes on every element.
+            const candidates = parentElement.querySelectorAll(_RES_EVENT_SELECTOR);
+            const bind = (elx, aName, name) => {
+                if (aName.slice(0, 6) !== 'res-on') return;
+                const ev = aName.slice(6);
+                if (!_RES_EVENTS.includes(ev)) return;        // skips res-on:override and res-onclick-remove
+                elx['on' + ev] = (event) => {
+                    const fn = this._resolveHandler(name, overrides);
+                    if (typeof fn === 'function') {
+                        try { fn(instance, event); }
+                        catch (e) { console.error('Resonant: ' + ev + ' handler error for', name, e); }
+                    } else {
+                        console.warn('Resonant: ' + ev + ' handler not found:', name);
+                    }
+                };
+            };
+            candidates.forEach(elx => {
+                // Walk the live attribute map directly; this runs once per
+                // rendered element, so avoid allocating an entries array.
+                const at = elx.attributes;
+                if (at && typeof at.length === 'number') {
+                    for (let i = 0; i < at.length; i++) bind(elx, at[i].name, at[i].value);
+                } else if (at) {
+                    for (const aName of Object.keys(at)) bind(elx, aName, at[aName]);
+                }
             });
             // res-onclick-remove: drop the current item from its parent array.
             parentElement.querySelectorAll('[res-onclick-remove]').forEach(elx => {
@@ -778,15 +837,14 @@
                         this.data[variableName] = this._createObject(variableName, newValue, '');
                     } else {
                         this.data[variableName] = newValue;
+                        // Scalars render in the batched flush, so many writes in
+                        // one tick cost one DOM update instead of one each (the
+                        // flush already re-rendered on top of the synchronous
+                        // write, so this also removes a duplicate render).
+                        this._queueUpdate(variableName, 'modified', this.data[variableName]);
+                        return;
                     }
                     this.updateElement(variableName);
-                    this.updateDisplayConditionalsFor(variableName);
-                    this.updateStylesFor(variableName);
-                    this._updateCssSelectorBindings(variableName);
-
-                    if (!Array.isArray(newValue) && !isObject(newValue)) {
-                        this._queueUpdate(variableName, 'modified', this.data[variableName]);
-                    }
                 }
             });
         }
@@ -848,10 +906,9 @@
                         });
                     }
 
+                    // updateElement runs the display, style and css-selector
+                    // passes itself; running them here again doubled the work.
                     this.updateElement(variableName);
-                    this.updateDisplayConditionalsFor(variableName);
-                    this.updateStylesFor(variableName);
-                    this._updateCssSelectorBindings(variableName);
 
                     if (this._changedArrayIndices[variableName]) {
                         delete this._changedArrayIndices[variableName];
@@ -962,20 +1019,21 @@
                 if (aName.slice(0, 7) === 'res-on:') overrides[aName.slice(7)] = aVal;
             }
 
-            let template;
-            const tplKey = variablePath + "_template";
-            if (!window[tplKey]) {
+            // The per-item template is cached on the template element itself.
+            // It used to live on window as <variable>_template, which leaked
+            // across instances and re-mounts: a second mount of the same
+            // variable name rendered with the first mount's markup.
+            let template = el.__res_template;
+            if (!template) {
                 // res-use="name" → clone a registered template as the per-item
                 // template instead of the element's own (empty) inner markup.
                 const useName = el.getAttribute('res-use');
                 template = (useName && this._templates[useName])
                     ? this._templates[useName].cloneNode(true)
                     : el.cloneNode(true);
-                window[tplKey] = template;
+                el.__res_template = template;
                 el.style.display = 'none';
                 el.setAttribute('res-template', 'true');
-            } else {
-                template = window[tplKey];
             }
 
             const existingElements = new Map();
@@ -987,6 +1045,7 @@
 
             const changedSet = this._changedArrayIndices[variablePath] || this._changedArrayIndices[this._getRootAndPath(variablePath).root];
             const usedElements = new Set();
+            const rendered = [];
 
             arrayValue.forEach((instance, index) => {
                 let elementKey = null;
@@ -998,7 +1057,6 @@
                 if (shouldReuse) {
                     elementToUse = existingElements.get(elementKey);
                     usedElements.add(elementToUse);
-                    elementToUse.setAttribute("res-index", index);
                 } else {
                     elementToUse = template.cloneNode(true);
                     elementToUse.removeAttribute('res-template');
@@ -1007,7 +1065,11 @@
                     elementToUse.setAttribute("res-key", elementKey);
                     elementToUse.setAttribute("res", variablePath);
                 }
-                elementToUse.setAttribute("res-index", index);
+                // Only rows whose position changed get an attribute write; a
+                // reused row that kept its index is left untouched.
+                if (elementToUse.getAttribute("res-index") !== String(index)) {
+                    elementToUse.setAttribute("res-index", index);
+                }
 
                 if (!shouldReuse) {
                     if (!isObject(instance)) {
@@ -1051,9 +1113,13 @@
                 if (isObject(instance)) {
                     const keys = Object.keys(instance);
                     keys.forEach(key => {
+                        // Nested arrays and objects are re-rendered on every pass
+                        // (nested changes are not attributed to a row index), but
+                        // a scalar property never needs the subtree lookup here.
+                        const value = this._resolveValue(instance, key, null);
+                        if (!Array.isArray(value) && !isObject(value)) return;
                         let subEl = elementToUse.querySelector(`[res-prop="${key}"]`);
                         if (subEl) {
-                            const value = this._resolveValue(instance, key, null);
                             if (Array.isArray(value)) {
                                 let parentKey = null;
                                 try { parentKey = arrayValue[index]?.key; } catch (_) {}
@@ -1078,7 +1144,7 @@
                     this._bindEvents(elementToUse, instance, arrayValue, overrides);
                 }
 
-                container.appendChild(elementToUse);
+                rendered.push(elementToUse);
             });
 
             existingElementsList.forEach(element => {
@@ -1086,6 +1152,20 @@
                     element.remove();
                 }
             });
+
+            // Lay the rows out as the last children of the container, in array
+            // order, moving only the rows that are not already in place. Walking
+            // from the end means an unchanged list costs zero DOM operations and
+            // a single edited row costs one insert, where every row used to be
+            // detached and re-appended.
+            let next = null;
+            for (let i = rendered.length - 1; i >= 0; i--) {
+                const node = rendered[i];
+                if (node.parentElement !== container || node.nextSibling !== next) {
+                    container.insertBefore(node, next);
+                }
+                next = node;
+            }
 
             // res-empty="name": show a registered template when the array is
             // empty, remove it once items exist. Marked so it isn't duplicated.
@@ -1242,7 +1322,7 @@
                         expr = expr.replace(rootPattern, 'item');
                     }
 
-                    const styleClass = (new Function('item', 'state', `return (${expr});`))(ctxItem, this.data);
+                    const styleClass = compileExpression(['item', 'state'], expr)(ctxItem, this.data);
 
                     if (typeof styleClass === 'string' && styleClass.trim()) {
                         styleClass.split(/\s+/).forEach(cls => styleElement.classList.add(cls));

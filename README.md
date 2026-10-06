@@ -360,6 +360,7 @@ Reactive arrays support all standard methods plus:
 | `.set(index, value)` | Update item at index |
 | `.delete(index)` | Remove item at index |
 | `.update(newArray)` | Replace entire array contents |
+| `.sort(fn)` / `.reverse()` | Standard in-place sort and reverse; the list re-renders with its rows reordered |
 | `.filterInPlace(fn)` | Mutating filter |
 | `.forceUpdate()` | Force re-render without changing data |
 
@@ -371,8 +372,10 @@ Reactive arrays support all standard methods plus:
 
 ## Performance
 
-- **Selective array re-rendering** -- when a property on one array item changes, only that item's DOM subtree is updated. Siblings are untouched, including their `res-display` and `res-style` evaluations.
-- **Batched updates** -- rapid changes within the same tick are coalesced into a single DOM update.
+- **Selective array re-rendering** -- when a property on one array item changes, only that item's row is re-created. Sibling rows are neither re-rendered nor moved, including their `res-display` and `res-style` evaluations: editing one item in a 1,000-item list costs one DOM insertion.
+- **Keyed reordering** -- `sort()`, `reverse()` and splices reuse the existing rows and move only the ones whose position changed.
+- **Batched updates** -- rapid changes within the same tick are coalesced into a single DOM update, for scalars as well as arrays and objects. Read the DOM after the next tick, not synchronously after a write.
+- **Compiled expressions** -- `res-display` and `res-style` expressions are compiled once per distinct expression and reused for every item.
 - **Computed property chains** -- cascading computed properties resolve in dependency order within a single pass.
 - **Stable keys** -- array items are tracked by stable keys for efficient reuse during re-renders.
 

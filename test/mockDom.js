@@ -88,6 +88,23 @@ class MockElement {
     this.children.push(child);
   }
   remove() { if (this.parentElement) { const idx = this.parentElement.children.indexOf(this); if (idx >= 0) this.parentElement.children.splice(idx,1); this.parentElement = null; } }
+  get nextSibling() {
+    if (!this.parentElement) return null;
+    const siblings = this.parentElement.children;
+    return siblings[siblings.indexOf(this) + 1] || null;
+  }
+  insertBefore(node, reference) {
+    if (reference == null) return this.appendChild(node);
+    if (node.parentElement) {
+      const i = node.parentElement.children.indexOf(node);
+      if (i >= 0) node.parentElement.children.splice(i, 1);
+    }
+    const idx = this.children.indexOf(reference);
+    if (idx < 0) throw new Error('insertBefore: reference node is not a child');
+    node.parentElement = this;
+    this.children.splice(idx, 0, node);
+    return node;
+  }
   // ── additions for the template features (closest / replaceWith / firstElementChild) ──
   get firstElementChild() { return this.children[0] || null; }
   closest(selector) {
