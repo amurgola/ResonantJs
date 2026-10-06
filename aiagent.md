@@ -23,8 +23,16 @@ ResonantJs adds reactive data-binding to vanilla HTML/JS pages. One `<script>` t
 | Constructor | `new Resonant()` | Create an instance. One per page is typical. |
 | `add` | `add(name, value?, persist?)` | Register a reactive variable. Omit `value` to bind an existing `window` variable. If only two args and the second is a `boolean`, it is treated as the persist flag. |
 | `addAll` | `addAll({ name: value, ... })` | Register multiple variables at once. |
+| `bind` | `bind(name, persist?)` | Make an existing `window` variable reactive. Equivalent to `add(name)` without a value; warns and does nothing if the variable is missing. |
 | `addCallback` | `addCallback(name, fn)` | `fn(currentValue, changedItem, action)` fires on every change. Actions: `added`, `removed`, `modified`, `updated`, `filtered`. |
 | `computed` | `computed(name, fn)` | Define a read-only derived value. Dependencies are tracked automatically. Chains are supported (computed A depending on computed B). |
+| `format` | `format(name, fn)` | Register how a top-level scalar renders. `fn(value, { done })` returns an HTML string written via `innerHTML`. |
+| `transform` | `transform(name, fn)` | Register a named value transform for `res-format="name"`. `fn(value, item)` returns an HTML string. Falls back to `window[name]` when unregistered. |
+| `stream` | `stream(name, { throttle?, preserveSelection? })` | Feed a top-level scalar incrementally. Returns a sink: `write(chunk)`, `rewind(n)`, `end()`, `fail(err)`. Repaints are throttled; `end()` renders once and fires callbacks once. |
+| `registerTemplate` | `registerTemplate(name, htmlOrElement)` | Register a reusable markup fragment (with `res-*` bindings inside) for `res-use`, `res-empty` and `res-include`. |
+| `handler` | `handler(name, fn)` | Register an injectable handler used by `res-onclick="res.name"`. `fn(item, event)`. A mount can override it with `res-on:name="globalFn"`. |
+| `bindEvents` | `bindEvents(rootEl?, item?)` | Wire `res-on<event>` attributes on static markup that is not part of an array template. |
+| `processIncludes` | `processIncludes(rootEl?)` | Expand `res-include` placeholders. Runs automatically after each `add`; call it after inserting markup yourself. |
 
 ### Binding existing window variables
 
@@ -32,6 +40,7 @@ ResonantJs adds reactive data-binding to vanilla HTML/JS pages. One `<script>` t
 window.username = 'Alice';
 res.add('username');        // picks up 'Alice', makes it reactive
 res.add('username', true);  // same, plus persists to localStorage
+res.bind('username');       // explicit alias; same behaviour and persist flag
 ```
 
 If the variable doesn't exist on `window`, a warning is logged and no binding is created.
@@ -54,8 +63,15 @@ res.add('theme', 'light', true);
 | `res-prop="key"` | Bind to a property of the parent `res` object or array item. Use `res-prop=""` (empty) to bind the whole item. | Inside a `res` element |
 | `res-display="expr"` | JS expression. Element is shown (`display: inherit`) when truthy, hidden (`display: none`) when falsy. Inside arrays, bare property names resolve to the current item. | Any element |
 | `res-style="expr"` | JS expression returning a space-separated class string. Previous classes from the expression are removed before new ones are applied. | Any element |
-| `res-onclick="fnName"` | Call a global function on click. If the function declares a parameter, the current item is passed. | Inside a `res` element |
+| `res-html` | Write the bound value with `innerHTML` instead of `textContent`. | Any bound element |
+| `res-format="name"` | Run the bound value through `transform(name)` (or global `name`) as `fn(value, item)` and write the returned HTML. Works on `res`, `res-prop`, nested arrays and scalar arrays. | Any bound element |
+| `res-onclick="fnName"` | Call a function on click as `fn(item, event)`. `fnName` is a global, or `res.name` for a handler registered with `handler()`. | Any element (array items, includes, or static markup via `bindEvents`) |
+| `res-on<event>="fnName"` | Same resolution as `res-onclick` for `dblclick`, `input`, `change`, `keydown`, `keyup`, `keypress`, `submit`, `blur`, `focus`, `mousedown`, `mouseup`. | Same as `res-onclick` |
+| `res-on:name="globalFn"` | Override the injected `res.name` handler for this mount only, so two mounts of one template can wire different handlers. | On a `res-use` or `res-include` element |
 | `res-onclick-remove="prop"` | Remove the current item from its parent array by matching the given property (e.g., `id`). | Inside an array template |
+| `res-use="tpl"` | Clone the registered template per array item instead of the element's own markup. | On an array `res` element |
+| `res-empty="tpl"` | Show the registered template while the array is empty; removed once items exist. | On an array `res` element |
+| `res-include="tpl"` | Replace the element with a clone of the registered template, bound to the nearest `res` context. | Any element |
 
 ---
 
@@ -202,6 +218,40 @@ res.addCallback('tasks', (value, item, action) => {
 });
 ```
 
+### Reusable templates and injected handlers
+
+```html
+<template id="row"><li><span res-prop="title" res-onclick="res.open"></span></li></template>
+<ul res="inbox" res-use="row" res-on:open="openMail" res-empty="noMail"></ul>
+<ul res="archive" res-use="row" res-on:open="openArchived"></ul>
+```
+
+```js
+res.registerTemplate('row', document.getElementById('row').content.firstElementChild);
+res.registerTemplate('noMail', '<li class="empty">Nothing here</li>');
+res.handler('open', (item, event) => console.log('default open', item));
+window.openMail = (item, event) => { /* used by the inbox mount only */ };
+res.add('inbox', []);
+res.add('archive', [{ title: 'old' }]);
+```
+
+### Formatting and streaming a scalar
+
+```html
+<div res="answer"></div>
+<span res-prop="price" res-format="money"></span>
+```
+
+```js
+res.add('answer', '');
+res.format('answer', (text, { done }) => renderMarkdown(text));
+res.transform('money', (value, item) => '$' + Number(value).toFixed(2));
+
+const sink = res.stream('answer', { throttle: 16 });
+for await (const token of tokens) sink.write(token);   // one repaint per throttle window
+sink.end();                                             // final render, one callback
+```
+
 ---
 
 ## Agent Workflow
@@ -212,7 +262,7 @@ When generating a page with ResonantJs:
 2. Create one `Resonant` instance.
 3. Register variables with `add` or `addAll`. Use `true` for persistence when appropriate.
 4. Define `computed` properties for derived values.
-5. Add HTML attributes (`res`, `res-prop`, `res-display`, `res-style`, `res-onclick`, `res-onclick-remove`) to bind the DOM.
+5. Add HTML attributes (`res`, `res-prop`, `res-display`, `res-style`, `res-format`, `res-onclick` / `res-on<event>`, `res-onclick-remove`, `res-use`, `res-empty`, `res-include`) to bind the DOM.
 6. Manipulate data directly -- the DOM updates automatically.
 7. Use `addCallback` for side effects (API calls, logging, etc.).
 

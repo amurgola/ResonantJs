@@ -1,6 +1,8 @@
 (() => {
     const PROXY_FLAG = Symbol('resonantProxy');
     const OBJECT_KEY = new WeakMap();
+    // DOM events bindable via res-on<event> (e.g. res-oninput, res-onkeydown).
+    const _RES_EVENTS = ['click', 'dblclick', 'input', 'change', 'keydown', 'keyup', 'keypress', 'submit', 'blur', 'focus', 'mousedown', 'mouseup'];
 
     function isObject(val) {
         return val !== null && typeof val === 'object';
@@ -314,6 +316,19 @@
             this._nextKeyId = 1;
             this._changedArrayIndices = {};
             this.cssSelectorBindings = {};
+            // Render transforms: variableName -> fn(value, { done }) => html.
+            // Used by updateElement's scalar branch AND the stream flush.
+            this._formatters = {};
+            // Active streams: top-level scalar name -> stream state record.
+            this._streams = {};
+            // Reusable templates: name -> root Element (cloned per use). Invoked
+            // via res-use="name" (array item template) / res-include="name".
+            this._templates = {};
+            // Injectable template handlers: name -> fn(item, event). Resolved by
+            // res-onclick="res.name"; overridable per-mount via res-on:name="fn".
+            this._handlers = {};
+            // Named value transforms for res-format="name": fn(value, item) -> html.
+            this._transforms = {};
         }
 
         _splitPath(path) {
@@ -472,12 +487,33 @@
 
             this._defineProperty(variableName);
             this.updateElement(variableName);
+            this._processIncludes();   // expand any res-include placeholders now in the DOM
         }
 
         addAll(config) {
             Object.entries(config).forEach(([variableName, value]) => {
                 this.add(variableName, value, false);
             });
+        }
+
+        bind(variableName, persist) {
+            // Check if variableName is a string
+            if (typeof variableName !== 'string') {
+                console.error('Resonant.bind: variableName must be a string');
+                return;
+            }
+
+            // Check if variable exists in window scope
+            if (!(variableName in window)) {
+                console.warn(`Resonant.bind: variable "${variableName}" not found in window scope`);
+                return;
+            }
+
+            // Get the current value from the window object
+            const currentValue = window[variableName];
+
+            // Add it to the reactive system (this will replace window[variableName] with a getter/setter)
+            this.add(variableName, currentValue, persist);
         }
 
         computed(computedName, computeFunction) {
@@ -637,38 +673,88 @@
             });
         }
 
-        _bindClickEvents(parentElement, instance, arrayValue) {
-            const onclickElements = parentElement.querySelectorAll('[res-onclick], [res-onclick-remove]');
-            onclickElements.forEach(onclickEl => {
-                const functionName = onclickEl.getAttribute('res-onclick');
-                const removeKey = onclickEl.getAttribute('res-onclick-remove');
+        // res-style sibling of _evaluateDisplayCondition: resolve the class
+        // expression (with the same item-property token rewriting) and swap the
+        // applied classes, tracking them in res-styles so the prior set is removed.
+        _evaluateStyleCondition(styleElement, instance, condition, variableName) {
+            try {
+                const prev = styleElement.getAttribute('res-styles');
+                if (prev) {
+                    prev.split(/\s+/).filter(Boolean).forEach(cls => styleElement.classList.remove(cls));
+                    styleElement.removeAttribute('res-styles');
+                }
+                // Evaluate with the item's properties as named params (so `active`
+                // resolves to the item) WITHOUT regex-rewriting the expression —
+                // string literals like 'active' must survive intact, since for
+                // res-style the returned string IS the class list. Top-level vars
+                // (e.g. a global) still resolve via the Function's outer scope.
+                let styleClass = '';
+                try {
+                    const keys = (instance && isObject(instance))
+                        ? Object.keys(instance).filter(k => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k))
+                        : [];
+                    const fn = new Function(...keys, 'item', 'state', `return (${condition});`);
+                    styleClass = fn(...keys.map(k => instance[k]), instance, this.data);
+                } catch (e) {
+                    styleClass = (new Function(`return (${condition});`))();
+                }
+                if (typeof styleClass === 'string' && styleClass.trim()) {
+                    styleClass.split(/\s+/).forEach(cls => styleElement.classList.add(cls));
+                    styleElement.setAttribute('res-styles', styleClass.trim());
+                }
+            } catch (e) {
+                console.error(`Error evaluating style for ${variableName}: ${condition}`, e);
+            }
+        }
 
-                if (functionName) {
-                    onclickEl.onclick = () => {
-                        const fn = (window && window[functionName]) || null;
-                        if (typeof fn === 'function') {
-                            try {
-                                if (fn.length > 0) fn(instance);
-                                else fn();
-                            } catch (e) {
-                                console.error('Resonant: onclick handler error for', functionName, e);
-                            }
-                        } else {
-                            console.warn('Resonant: onclick handler not found:', functionName);
-                        }
-                    };
-                }
-                if (removeKey) {
-                    onclickEl.onclick = () => {
-                        if (arrayValue && Array.isArray(arrayValue)) {
-                            const removeIdx = arrayValue.findIndex(t => isObject(t) && t[removeKey] === instance[removeKey]);
-                            if (removeIdx !== -1) {
-                                arrayValue.splice(removeIdx, 1);
-                            }
-                        }
-                    };
-                }
+        // Per-item res-style pass (mirror of _handleDisplayElements). This is what
+        // makes res-style="active ? 'active' : ''" work on array items — it was
+        // previously only reachable via updateStylesFor's top-level selector,
+        // which never matches a bare item-property expression.
+        _handleStyleElements(parentElement, instance, variableName) {
+            const styleElements = parentElement.querySelectorAll('[res-style]');
+            styleElements.forEach(styleEl => {
+                this._evaluateStyleCondition(styleEl, instance, styleEl.getAttribute('res-style') || '', variableName);
             });
+        }
+
+        // Bind res-on<event> handlers (click, input, change, keydown, …). All
+        // resolve the same way as res-onclick (baked window fn | injected res.X
+        // | per-mount res-on: override) and fire as fn(item, event).
+        _bindEvents(parentElement, instance, arrayValue, overrides) {
+            _RES_EVENTS.forEach(ev => {
+                const attr = 'res-on' + ev;
+                parentElement.querySelectorAll('[' + attr + ']').forEach(elx => {
+                    const name = elx.getAttribute(attr);
+                    elx['on' + ev] = (event) => {
+                        const fn = this._resolveHandler(name, overrides);
+                        if (typeof fn === 'function') {
+                            try { fn(instance, event); }
+                            catch (e) { console.error('Resonant: ' + ev + ' handler error for', name, e); }
+                        } else {
+                            console.warn('Resonant: ' + ev + ' handler not found:', name);
+                        }
+                    };
+                });
+            });
+            // res-onclick-remove: drop the current item from its parent array.
+            parentElement.querySelectorAll('[res-onclick-remove]').forEach(elx => {
+                const removeKey = elx.getAttribute('res-onclick-remove');
+                elx.onclick = () => {
+                    if (Array.isArray(arrayValue)) {
+                        const i = arrayValue.findIndex(t => isObject(t) && t[removeKey] === instance[removeKey]);
+                        if (i !== -1) arrayValue.splice(i, 1);
+                    }
+                };
+            });
+        }
+
+        // Bind res-on<event> handlers on arbitrary (static) markup — for elements
+        // that aren't part of an array template or res-include. instance is the
+        // optional data context passed to handlers.
+        bindEvents(rootEl, instance) {
+            this._bindEvents(rootEl || this.config.rootElement, instance ?? null, null, null);
+            return this;
         }
 
         _defineProperty(variableName) {
@@ -819,11 +905,7 @@
                     });
                 }
                 else {
-                    if (element.hasAttribute('res-html')) {
-                        element.innerHTML = boundValue ?? '';
-                    } else {
-                        element.textContent = boundValue ?? '';
-                    }
+                    this._writeValue(element, boundValue, resAttr);
                 }
             });
 
@@ -865,11 +947,7 @@
                 });
             }
             else {
-                if (subEl.hasAttribute('res-html')) {
-                    subEl.innerHTML = propValue ?? '';
-                } else {
-                    subEl.textContent = propValue ?? '';
-                }
+                this._writeValue(subEl, propValue, null, this._getByPath(parentVarName));
             }
         }
 
@@ -877,10 +955,22 @@
             const arrayValue = this._getByPath(variablePath);
             const container = el.hasAttribute('res') && el.parentElement ? el.parentElement : el;
 
+            // Per-mount handler overrides: res-on:foo="globalFn" -> { foo: 'globalFn' }.
+            // Lets two mounts of the SAME res-use template wire different handlers.
+            const overrides = {};
+            for (const [aName, aVal] of this._attrEntries(el)) {
+                if (aName.slice(0, 7) === 'res-on:') overrides[aName.slice(7)] = aVal;
+            }
+
             let template;
             const tplKey = variablePath + "_template";
             if (!window[tplKey]) {
-                template = el.cloneNode(true);
+                // res-use="name" → clone a registered template as the per-item
+                // template instead of the element's own (empty) inner markup.
+                const useName = el.getAttribute('res-use');
+                template = (useName && this._templates[useName])
+                    ? this._templates[useName].cloneNode(true)
+                    : el.cloneNode(true);
                 window[tplKey] = template;
                 el.style.display = 'none';
                 el.setAttribute('res-template', 'true');
@@ -922,19 +1012,7 @@
                 if (!shouldReuse) {
                     if (!isObject(instance)) {
                         const anyPlace = elementToUse.querySelector('[res-prop=""]');
-                        if (anyPlace) {
-                            if (anyPlace.hasAttribute('res-html')) {
-                                anyPlace.innerHTML = String(instance);
-                            } else {
-                                anyPlace.textContent = String(instance);
-                            }
-                        } else {
-                            if (elementToUse.hasAttribute('res-html')) {
-                                elementToUse.innerHTML = String(instance);
-                            } else {
-                                elementToUse.textContent = String(instance);
-                            }
-                        }
+                        this._writeValue(anyPlace || elementToUse, String(instance), null, instance);
                     } else {
                         const keys = Object.keys(instance);
                         keys.forEach(key => {
@@ -961,11 +1039,9 @@
                                     );
                                 }
                                 else if (!Array.isArray(value) && !isObject(value)) {
-                                    if (subEl.hasAttribute('res-html')) {
-                                        subEl.innerHTML = value ?? '';
-                                    } else {
-                                        subEl.textContent = value ?? '';
-                                    }
+                                    // res-format runs the value through a named transform
+                                    // fn(value, item) and writes the (HTML) result.
+                                    this._writeValue(subEl, value, null, instance);
                                 }
                             }
                         });
@@ -998,7 +1074,8 @@
 
                 if (!shouldReuse) {
                     this._handleDisplayElements(elementToUse, instance, variablePath);
-                    this._bindClickEvents(elementToUse, instance, arrayValue);
+                    this._handleStyleElements(elementToUse, instance, variablePath);
+                    this._bindEvents(elementToUse, instance, arrayValue, overrides);
                 }
 
                 container.appendChild(elementToUse);
@@ -1009,6 +1086,22 @@
                     element.remove();
                 }
             });
+
+            // res-empty="name": show a registered template when the array is
+            // empty, remove it once items exist. Marked so it isn't duplicated.
+            const emptyName = el.getAttribute('res-empty');
+            if (emptyName) {
+                const existingEmpty = container.querySelector(`[res-empty-for="${variablePath}"]`);
+                if (arrayValue.length === 0) {
+                    if (!existingEmpty && this._templates[emptyName]) {
+                        const node = this._templates[emptyName].cloneNode(true);
+                        node.setAttribute('res-empty-for', variablePath);
+                        container.appendChild(node);
+                    }
+                } else if (existingEmpty) {
+                    existingEmpty.remove();
+                }
+            }
         }
 
         _renderNestedArray(subEl, arrayValue, parentKey, parentVarPath) {
@@ -1028,11 +1121,7 @@
                 cloned.setAttribute('res-index', idx);
 
                 if (item !== null && !isObject(item)) {
-                    if (cloned.hasAttribute('res-html')) {
-                        cloned.innerHTML = item;
-                    } else {
-                        cloned.textContent = item;
-                    }
+                    this._writeValue(cloned, item, null, item);
                 } else {
                     const nestedEls = cloned.querySelectorAll('[res-prop]');
                     nestedEls.forEach(nestedEl => {
@@ -1050,7 +1139,7 @@
                         this._evaluateDisplayCondition(cloned, item, displayCondition, parentVarPath);
                     }
                     this._handleDisplayElements(cloned, item, parentVarPath);
-                    this._bindClickEvents(cloned, item, arrayValue);
+                    this._bindEvents(cloned, item, arrayValue);
                 }
                 subEl.appendChild(cloned);
             });
@@ -1119,11 +1208,21 @@
                     let parent = styleElement;
                     let boundPath = null;
                     let index = null;
+                    // NEAREST res ancestor wins, same as
+                    // updateDisplayConditionalsFor's walk. Without the break
+                    // the loop kept climbing and the OUTERMOST res won, so in
+                    // nested arrays res-style and res-display on one element
+                    // resolved to two different items. res-index is read off
+                    // the res-bearing node because _renderArray sets both on
+                    // the same element.
                     while (parent) {
                         const r = parent.getAttribute && parent.getAttribute('res');
-                        const i = parent.getAttribute && parent.getAttribute('res-index');
-                        if (r) boundPath = r;
-                        if (i !== null && i !== undefined) index = i;
+                        if (r) {
+                            boundPath = r;
+                            const i = parent.getAttribute('res-index');
+                            if (i !== null && i !== undefined) index = i;
+                            break;
+                        }
                         parent = parent.parentElement;
                     }
                     let ctxItem = null;
@@ -1162,6 +1261,206 @@
             this.callbacks[variableName].push(method);
         }
 
+        // ── Reusable templates ──────────────────────────────────────────
+        // Register a named markup fragment (with res-* bindings inside) once,
+        // then invoke it anywhere via res-use="name" (as an array's per-item
+        // template) or res-include="name" (standalone). Keeps shared markup in
+        // one place — e.g. a resonantTemplates.js — out of the logic file.
+        registerTemplate(name, source) {
+            // Accept an HTML string (parsed via innerHTML) OR a pre-built element
+            // (a <template>'s content root, or one assembled in code/tests).
+            let root;
+            if (source && typeof source === 'object' && (source.tagName || source.nodeType)) {
+                root = source;
+            } else {
+                const holder = document.createElement('div');
+                holder.innerHTML = String(source).trim();
+                root = holder.firstElementChild || (holder.children && holder.children[0]) || null;
+            }
+            if (!root) { console.warn('Resonant: registerTemplate("' + name + '") has no root element'); return this; }
+            this._templates[name] = root;
+            return this;
+        }
+
+        // Attribute entries as [name, value] pairs, across DOM impls: a live
+        // NamedNodeMap (browser) or a plain object (lightweight test DOMs).
+        _attrEntries(el) {
+            const at = el && el.attributes;
+            if (!at) return [];
+            if (typeof at.length === 'number') return Array.from(at).map(a => [a.name, a.value]);
+            return Object.keys(at).map(k => [k, at[k]]);
+        }
+
+        // Register an injectable template handler. A template button bound with
+        // res-onclick="res.foo" calls this at click time as fn(item, event).
+        // Per-mount overrides (res-on:foo="globalFn") take precedence.
+        handler(name, fn) {
+            if (typeof fn === 'function') this._handlers[name] = fn;
+            return this;
+        }
+
+        // Register a named value transform for res-format="name" (a res-prop
+        // formatter, e.g. markdown / dates). fn(value, item) -> html string.
+        transform(name, fn) {
+            if (typeof fn === 'function') this._transforms[name] = fn;
+            return this;
+        }
+        _resolveFormat(name) {
+            if (typeof this._transforms[name] === 'function') return this._transforms[name];
+            return (typeof window[name] === 'function') ? window[name] : null;
+        }
+
+        // THE place a bound value lands in the DOM. Every render path funnels
+        // through here so the four conventions resolve in one documented
+        // order, everywhere:
+        //   1. res-format="name"  → transform(name) | window[name], fn(value, item)
+        //   2. format(variableName) formatter        → fn(value, { done })
+        //   3. res-html                              → innerHTML
+        //   4. textContent
+        // res-format used to be honoured by only two of the seven writers, so
+        // putting it on a res-prop inside a nested array or on a bound object
+        // property silently did nothing. `variableName` is passed only where a
+        // top-level formatter can apply (updateElement, the stream flush) —
+        // per-item writers pass null, since _formatters is keyed by top-level
+        // variable name, not by array index or property path.
+        _writeValue(el, value, variableName, item, meta) {
+            const fmtName = el.getAttribute && el.getAttribute('res-format');
+            const fmt = fmtName ? this._resolveFormat(fmtName) : null;
+            if (fmt) { el.innerHTML = String(fmt(value, item) ?? ''); return; }
+            const named = variableName ? this._formatters[variableName] : null;
+            if (named) { el.innerHTML = named(value ?? '', meta || { done: true }); return; }
+            if (el.hasAttribute('res-html')) el.innerHTML = value ?? '';
+            else el.textContent = value ?? '';
+        }
+
+        // Resolve a res-onclick attribute value to a callable. Three tiers:
+        //   "res.foo"  -> mount override (res-on:foo) | this._handlers.foo
+        //   "foo"      -> window.foo  (legacy fixed handler)
+        _resolveHandler(attrValue, overrides) {
+            if (attrValue.slice(0, 4) === 'res.') {
+                const key = attrValue.slice(4);
+                if (overrides && overrides[key] && typeof window[overrides[key]] === 'function') return window[overrides[key]];
+                if (typeof this._handlers[key] === 'function') return this._handlers[key];
+                return null;
+            }
+            return (typeof window[attrValue] === 'function') ? window[attrValue] : null;
+        }
+
+        // Expand standalone res-include="name" placeholders: replace each with a
+        // clone of the registered template, then bind it (res-display, res-prop
+        // against the nearest res ancestor, res-onclick incl. injected res.X with
+        // per-mount res-on:* overrides). Idempotent — replaced nodes drop the
+        // attribute, so re-scans skip them. Auto-run after each add(); also
+        // callable manually as processIncludes(rootEl) right after inserting markup.
+        processIncludes(rootEl) { this._processIncludes(rootEl); return this; }
+        _processIncludes(rootEl) {
+            const host = rootEl || this.config.rootElement;
+            if (!host || !host.querySelectorAll) return;
+            Array.from(host.querySelectorAll('[res-include]')).forEach((el) => {
+                const name = el.getAttribute('res-include');
+                const tpl = this._templates[name];
+                if (!tpl) { console.warn('Resonant: res-include template not found:', name); return; }
+                const node = tpl.cloneNode(true);
+                const overrides = {};
+                for (const [aName, aVal] of this._attrEntries(el)) {
+                    if (aName.slice(0, 7) === 'res-on:') overrides[aName.slice(7)] = aVal;
+                }
+                let instance = null, ctxPath = null;
+                const ctxEl = el.parentElement && el.parentElement.closest('[res]');
+                if (ctxEl) { ctxPath = ctxEl.getAttribute('res'); try { instance = this._getByPath(ctxPath); } catch (_) {} }
+                el.replaceWith(node);
+                this._handleDisplayElements(node, instance, ctxPath);
+                this._bindEvents(node, instance, null, overrides);
+                if (instance && isObject(instance)) {
+                    node.querySelectorAll('[res-prop]').forEach((subEl) => {
+                        const key = subEl.getAttribute('res-prop');
+                        if (key && key in instance) this._renderObjectProperty(subEl, instance[key], ctxPath, key);
+                    });
+                }
+            });
+        }
+
+        // ── Render transform ────────────────────────────────────────────
+        // Register how a value renders to the DOM. fn(value, { done }) returns
+        // an HTML string written via innerHTML. Used by updateElement's scalar
+        // branch and by the stream flush. Generalizes markdown, dates, numbers.
+        format(variableName, fn) {
+            if (typeof fn !== 'function') {
+                console.warn('Resonant: format() expects a function for', variableName);
+                return this;
+            }
+            this._formatters[variableName] = fn;
+            this.updateElement(variableName);
+            return this;
+        }
+
+        // ── Streaming sink ──────────────────────────────────────────────
+        // Feed a top-level scalar incrementally. Returns a push sink:
+        //   sink.write(chunk)  append text, throttled non-destructive repaint
+        //   sink.rewind(n)     truncate the last n chars (e.g. retraction)
+        //   sink.end()         authoritative final render + one persist/callback
+        //   sink.fail(err)     terminal error end
+        // Writes go straight to data[name], bypassing the per-set render so a
+        // token flood doesn't re-run the formatter per token. The getter still
+        // returns the accumulated raw text, so computed/callbacks/history see it.
+        stream(variableName, opts = {}) {
+            if (variableName.indexOf('.') !== -1) {
+                console.warn('Resonant: stream() targets a top-level scalar; got', variableName);
+            }
+            const throttle = Number(opts.throttle) || 0;
+            const preserveSelection = opts.preserveSelection !== false;
+            const st = this._streams[variableName] = {
+                raw: String(this.data[variableName] ?? ''),
+                throttle, preserveSelection, timer: null,
+            };
+            const schedule = () => {
+                if (st.timer) return;
+                st.timer = setTimeout(() => { st.timer = null; this._flushStream(variableName); }, throttle);
+            };
+            const commit = (raw) => { st.raw = raw; this.data[variableName] = raw; };
+            return {
+                write: (chunk) => { commit(st.raw + String(chunk ?? '')); schedule(); return this; },
+                rewind: (n) => { commit(st.raw.slice(0, -Math.max(0, n | 0) || st.raw.length)); schedule(); return this; },
+                end: () => { this._endStream(variableName, true); return this; },
+                fail: (err) => { this._endStream(variableName, false, err); return this; },
+            };
+        }
+
+        _flushStream(variableName, final = false) {
+            const st = this._streams[variableName];
+            const raw = (st ? st.raw : this.data[variableName]) ?? '';
+            const elements = this.config.rootElement.querySelectorAll(`[res="${variableName}"]`);
+            // Selection guard: never blow away a selection the user is making
+            // inside the live body. Defer until they release it (final renders
+            // unconditionally). Generalized from chat-mode.js scheduleStreamRender.
+            if (!final && st && st.preserveSelection && typeof window !== 'undefined' && window.getSelection) {
+                const sel = window.getSelection();
+                if (sel && !sel.isCollapsed && sel.anchorNode) {
+                    for (const el of elements) {
+                        if (el.contains(sel.anchorNode)) {
+                            if (!st.timer) st.timer = setTimeout(() => { st.timer = null; this._flushStream(variableName); }, st.throttle || 16);
+                            return;
+                        }
+                    }
+                }
+            }
+            elements.forEach(el => {
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') { el.value = raw; return; }
+                this._writeValue(el, raw, variableName, null, { done: final });
+            });
+        }
+
+        _endStream(variableName, ok, err) {
+            const st = this._streams[variableName];
+            if (st && st.timer) { clearTimeout(st.timer); st.timer = null; }
+            if (st) this.data[variableName] = st.raw;
+            this._flushStream(variableName, true);     // authoritative final render
+            delete this._streams[variableName];
+            if (err) console.error('Resonant: stream failed for', variableName, err);
+            // ONE persist + callback for the whole stream (queued, deduped).
+            this._queueUpdate(variableName, ok ? 'modified' : 'error', this.data[variableName]);
+        }
+
         bindByCssSelector(variableName, cssSelector) {
             if (!this.cssSelectorBindings[variableName]) {
                 this.cssSelectorBindings[variableName] = new Set();
@@ -1187,11 +1486,11 @@
                         if (tag === 'INPUT' || tag === 'TEXTAREA') {
                             el.value = displayValue;
                         } else {
-                            if (el.hasAttribute('res-html')) {
-                                el.innerHTML = displayValue;
-                            } else {
-                                el.textContent = displayValue;
-                            }
+                            // No variableName: a css-selector binding target is
+                            // not a res element, and applying the top-level
+                            // formatter here would double-render what
+                            // updateElement already wrote.
+                            this._writeValue(el, displayValue, null);
                         }
                     });
                 } catch (_) {}
