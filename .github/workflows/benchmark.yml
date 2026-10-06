@@ -1,0 +1,33 @@
+# Runs the unit suite and the browser benchmark on every pull request, and
+# A/B compares the PR head against its base branch. A scenario that produces
+# more DOM mutations or elements than the base fails the job; timing and heap
+# changes beyond the threshold are reported in the job summary but do not
+# fail, since shared runners are too noisy for that to be reliable.
+name: Benchmark
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - name: Benchmark PR head against base branch
+        run: node bench/run.js --against origin/${{ github.base_ref || 'main' }} --iterations 7 --summary "$GITHUB_STEP_SUMMARY" --json bench/results/benchmark.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: bench/results/benchmark.json

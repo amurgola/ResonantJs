@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ResonantJs Benchmarks</title>
+    <script src="../resonant.js"></script>
+    <script src="scenarios.js"></script>
+    <script src="harness.js"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+        table { border-collapse: collapse; margin-top: 1rem; font-variant-numeric: tabular-nums; }
+        th, td { border: 1px solid #ccc; padding: 0.35rem 0.6rem; text-align: right; }
+        th:first-child, td:first-child { text-align: left; }
+        #bench-root { position: absolute; left: -10000px; top: 0; width: 800px; }
+        .controls { display: flex; gap: 0.75rem; align-items: center; }
+        .unstable { color: #b00; }
+    </style>
+</head>
+<body>
+    <h1>ResonantJs Benchmarks</h1>
+    <p>Each scenario runs in this page against <code>../resonant.js</code>. For DevTools-level CPU, layout and heap numbers, and for comparing two versions, use <code>node bench/run.js</code>.</p>
+    <div class="controls">
+        <label>Iterations <input id="iterations" type="number" value="5" min="1" max="50"></label>
+        <label>Filter <input id="filter" type="text" placeholder="scenario name contains…"></label>
+        <button id="run">Run</button>
+        <span id="progress"></span>
+    </div>
+    <table id="results" hidden>
+        <thead>
+            <tr><th>Scenario</th><th>run ms</th><th>frame ms</th><th>nodes +</th><th>nodes −</th><th>attr Δ</th><th>text Δ</th><th>DOM elements</th><th>heap MB</th></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <script>
+        document.getElementById('run').onclick = async () => {
+            const table = document.getElementById('results');
+            const body = table.querySelector('tbody');
+            const progress = document.getElementById('progress');
+            body.innerHTML = '';
+            table.hidden = false;
+            const rows = await ResonantBench.runAll({
+                iterations: Number(document.getElementById('iterations').value) || 5,
+                filter: document.getElementById('filter').value,
+                onProgress: (name, i, n) => { progress.textContent = name + ' (' + i + '/' + n + ')'; },
+            });
+            progress.textContent = 'done';
+            for (const row of rows) {
+                const tr = document.createElement('tr');
+                const cells = [
+                    row.name + (row.stable ? '' : ' (unstable counts)'),
+                    row.runMs.toFixed(2), row.frameMs.toFixed(2),
+                    row.mutations.nodesAdded, row.mutations.nodesRemoved,
+                    row.mutations.attributeChanges, row.mutations.textChanges,
+                    row.domNodes, row.heapBytes == null ? 'n/a' : (row.heapBytes / 1048576).toFixed(1),
+                ];
+                cells.forEach((text) => { const td = document.createElement('td'); td.textContent = text; tr.appendChild(td); });
+                if (!row.stable) tr.className = 'unstable';
+                body.appendChild(tr);
+            }
+        };
+    </script>
+</body>
+</html>

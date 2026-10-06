@@ -1,6 +1,6 @@
 {
   "name": "resonantjs",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "A lightweight JavaScript framework that enables reactive data-binding for building dynamic and responsive web applications. It simplifies creating interactive UIs by automatically updating the DOM when your data changes.",
   "main": "resonant.js",
   "repository": {
@@ -15,9 +15,13 @@
   "homepage": "https://github.com/amurgola/ResonantJs#readme",
   "scripts": {
     "test": "node --test",
-    "build": "node scripts/build.js"
+    "build": "node scripts/build.js",
+    "bench": "node bench/run.js",
+    "bench:compare": "node bench/run.js --against origin/main",
+    "bench:baseline": "node bench/run.js --save-baseline"
   },
   "devDependencies": {
+    "playwright": "^1.56.1",
     "terser": "^5.34.1"
   }
 }

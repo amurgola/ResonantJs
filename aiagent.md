@@ -128,6 +128,8 @@ items.splice(1, 1);                      // second <li> removed
 
 ### Array methods
 
+Standard mutators (`push`, `splice`, `sort`, `reverse`, index assignment, `length`) all re-render. Rows are keyed, so a sort or reverse moves existing rows instead of re-creating them, and changing one item re-creates only that row.
+
 Reactive arrays support all standard `Array` methods plus:
 
 | Method | Description |
@@ -267,6 +269,8 @@ When generating a page with ResonantJs:
 7. Use `addCallback` for side effects (API calls, logging, etc.).
 
 ### Common mistakes to avoid
+
+- **Reading the DOM synchronously after a write**: all updates, including scalars, are applied in a batched flush on the next tick. `res.add('n', 1); n = 2;` leaves the DOM showing `1` until the tick ends. Use `addCallback` or await a timeout before inspecting the DOM.
 
 - **Forgetting the template element**: `res` on an array must be placed on a single element inside a container (e.g., `<li>` inside `<ul>`). The element becomes the template.
 - **Setting computed properties**: They are read-only. Assign through their dependencies instead.
