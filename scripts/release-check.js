@@ -9,8 +9,10 @@
 //   node scripts/release-check.js --strict       exit 1 when nothing is left to release
 //   node scripts/release-check.js --npm-version  exit 1 unless npm is 11.5.1+ (trusted publishing)
 //   node scripts/release-check.js --oidc-claims  in GitHub Actions: fetch the job's OIDC token for
-//                                                npm and print the claims npm matches against the
-//                                                trusted publisher (repository, workflow, ref ...)
+//                                                npm, print the claims npm matches against the
+//                                                trusted publisher (repository, workflow, ref ...),
+//                                                then perform npm's token exchange and fail with
+//                                                the registry's message if it is rejected
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -39,9 +41,12 @@ if (process.argv.includes('--npm-version')) {
 }
 
 // Trusted publishing fails silently inside npm when the registry rejects the
-// OIDC exchange (npm then falls back to whatever token is configured and the
-// publish dies with a 404). Showing the token's claims makes a mismatch with
-// the npmjs.com trusted publisher obvious. The token itself is never printed.
+// OIDC exchange: npm logs the rejection only at verbose level, falls back to
+// whatever token is configured, and the publish dies with an unexplained 404.
+// This repeats npm's exchange (POST /-/npm/v1/oidc/token/exchange/package/<name>
+// with the id token as a bearer) so the registry's real answer is visible, and
+// shows the token's claims so a mismatch with the npmjs.com trusted publisher
+// is obvious. Neither the id token nor the exchanged token is ever printed.
 function oidcClaims() {
     const url = process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
     const bearer = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
@@ -59,13 +64,33 @@ function oidcClaims() {
         const shown = ['repository', 'repository_owner', 'workflow_ref', 'job_workflow_ref', 'ref', 'environment', 'event_name', 'aud', 'iss'];
         const rows = shown.map((k) => [k, payload[k] === undefined ? '(absent)' : String(payload[k])]);
         rows.forEach(([k, v]) => console.log(`${k}=${v}`));
-        if (process.env.GITHUB_STEP_SUMMARY) {
-            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-                '### OIDC claims presented to npm\n\nThe npmjs.com trusted publisher must match these exactly: '
-                + 'organization or user = `repository_owner`, repository = the part of `repository` after the slash, '
-                + 'workflow filename = the file in `workflow_ref`, environment = `environment` (blank if absent).\n\n'
-                + '| Claim | Value |\n|---|---|\n' + rows.map(([k, v]) => `| ${k} | \`${v}\` |`).join('\n') + '\n\n');
+        const summary = (text) => { if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, text); };
+        summary('### OIDC claims presented to npm\n\nThe npmjs.com trusted publisher must match these exactly: '
+            + 'organization or user = `repository_owner`, repository = the part of `repository` after the slash, '
+            + 'workflow filename = the file in `workflow_ref`, environment = `environment` (blank if absent).\n\n'
+            + '| Claim | Value |\n|---|---|\n' + rows.map(([k, v]) => `| ${k} | \`${v}\` |`).join('\n') + '\n\n');
+
+        // The same exchange npm publish performs, so a rejection is explained
+        // here instead of surfacing later as an unexplained 404.
+        const name = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).name;
+        const registry = (process.env.NPM_CONFIG_REGISTRY || 'https://registry.npmjs.org').replace(/\/+$/, '');
+        const exchange = await fetch(`${registry}/-/npm/v1/oidc/token/exchange/package/${encodeURIComponent(name)}`, {
+            method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${value}` },
+        });
+        const text = await exchange.text();
+        let body = {};
+        try { body = JSON.parse(text); } catch (_) { body = { message: text.slice(0, 300) }; }
+        if (!exchange.ok || !body.token) {
+            const reason = body.message || body.error || '(no message)';
+            console.error(`npm rejected the OIDC token exchange for ${name}: HTTP ${exchange.status} ${reason}`);
+            console.error('Compare the claims above with the trusted publisher on npmjs.com (package → Settings → Trusted Publisher): '
+                + 'organization or user, repository (exact spelling and case), workflow filename and environment must all match, '
+                + 'and "npm publish" must be allowed. The required fields cannot be edited there: delete the entry and create it again.');
+            summary(`**npm rejected the OIDC token exchange:** HTTP ${exchange.status} ${reason}\n\n`);
+            process.exit(1);
         }
+        console.log('oidc_exchange=accepted');
+        summary('npm accepted the OIDC token exchange: this workflow is a valid trusted publisher for `' + name + '`.\n\n');
     })().catch((err) => { console.error('OIDC claims check failed:', err.message); process.exit(1); });
 }
 if (process.argv.includes('--oidc-claims')) { oidcClaims(); } else { main(); }

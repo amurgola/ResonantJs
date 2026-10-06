@@ -84,9 +84,10 @@ jobs:
         run: node scripts/release-check.js --strict
 
       # Fails when the job has no OIDC token (id-token: write not granted),
-      # otherwise records the claims npm will present so a mismatch with the
-      # npmjs.com trusted publisher is visible in the job summary.
-      - name: Check OIDC token and show its claims
+      # records the claims npm will present, then performs npm's token
+      # exchange so a trusted publisher mismatch fails here with the
+      # registry's message instead of as an unexplained 404 from npm publish.
+      - name: Verify npm accepts this workflow as a trusted publisher
         if: ${{ !inputs.dry_run && (inputs.auth || 'trusted') == 'trusted' }}
         run: node scripts/release-check.js --oidc-claims
 
