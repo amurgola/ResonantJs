@@ -154,6 +154,8 @@ Already have a variable on `window`? Register it without passing a value.
 window.username = 'Alice';
 res.add('username');       // picks up 'Alice', makes it reactive
 res.add('username', true); // same, but also persists to localStorage
+res.bind('username');      // explicit alias for the same thing
+res.bind('username', true);
 ```
 
 ### Event handling
@@ -319,6 +321,7 @@ Copy this into an `.html` file and open it in your browser.
 | `new Resonant()` | Create an instance |
 | `.add(name, value?, persist?)` | Add a reactive variable. Omit `value` to bind an existing `window` variable. Pass `true` as second or third arg to persist to `localStorage`. |
 | `.addAll({ name: value, ... })` | Add multiple variables at once |
+| `.bind(name, persist?)` | Make an existing `window` variable reactive. Same as `add(name)` with no value, but states the intent explicitly. |
 | `.addCallback(name, fn)` | Listen for changes. `fn(currentValue, item, action)` |
 | `.computed(name, fn)` | Define a read-only derived value |
 | `.bindByCssSelector(name, selector)` | One-way bind a variable to all elements matching a CSS selector. Also available as `myVar.bindByCssSelector(selector)` on objects and arrays. |

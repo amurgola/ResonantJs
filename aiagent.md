@@ -23,6 +23,7 @@ ResonantJs adds reactive data-binding to vanilla HTML/JS pages. One `<script>` t
 | Constructor | `new Resonant()` | Create an instance. One per page is typical. |
 | `add` | `add(name, value?, persist?)` | Register a reactive variable. Omit `value` to bind an existing `window` variable. If only two args and the second is a `boolean`, it is treated as the persist flag. |
 | `addAll` | `addAll({ name: value, ... })` | Register multiple variables at once. |
+| `bind` | `bind(name, persist?)` | Make an existing `window` variable reactive. Equivalent to `add(name)` without a value; warns and does nothing if the variable is missing. |
 | `addCallback` | `addCallback(name, fn)` | `fn(currentValue, changedItem, action)` fires on every change. Actions: `added`, `removed`, `modified`, `updated`, `filtered`. |
 | `computed` | `computed(name, fn)` | Define a read-only derived value. Dependencies are tracked automatically. Chains are supported (computed A depending on computed B). |
 | `format` | `format(name, fn)` | Register how a top-level scalar renders. `fn(value, { done })` returns an HTML string written via `innerHTML`. |
@@ -39,6 +40,7 @@ ResonantJs adds reactive data-binding to vanilla HTML/JS pages. One `<script>` t
 window.username = 'Alice';
 res.add('username');        // picks up 'Alice', makes it reactive
 res.add('username', true);  // same, plus persists to localStorage
+res.bind('username');       // explicit alias; same behaviour and persist flag
 ```
 
 If the variable doesn't exist on `window`, a warning is logged and no binding is created.
