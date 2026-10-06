@@ -1,0 +1,108 @@
+# Release ResonantJs: verify the build, publish package.json's version to npm,
+# and create a GitHub release tagged v<version> with generated notes.
+#
+# Run it manually from the Actions tab (workflow_dispatch). Every step is
+# idempotent, so re-running after a partial failure finishes the release
+# instead of republishing: a version already on npm is not published again,
+# and an existing tag is not re-created. When both already exist the run
+# fails early and asks for a version bump.
+#
+# Creating a release by hand in the GitHub UI still publishes to npm, as the
+# old workflow did. A release created by this workflow uses the Actions token,
+# which does not trigger workflows, so there is no double publish.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      npm_tag:
+        description: npm dist-tag to publish under
+        type: string
+        default: latest
+      dry_run:
+        description: Build and verify, run npm publish --dry-run, create nothing
+        type: boolean
+        default: false
+  release:
+    types: [created]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write    # create the tag and release
+  id-token: write    # npm provenance attestation
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org/
+
+      - run: npm ci
+
+      - name: Build (runs the test suite, then minifies)
+        run: npm run build
+
+      - name: Verify the committed minified bundle is current
+        run: |
+          if ! git diff --quiet -- resonant.min.js resonant.min.js.map; then
+            echo "::error::resonant.min.js is out of date. Run 'npm run build' and commit the result before releasing."
+            git --no-pager diff --stat -- resonant.min.js resonant.min.js.map
+            exit 1
+          fi
+
+      - name: Release preflight
+        id: check
+        run: node scripts/release-check.js --strict
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
+
+      - name: Publish to npm (dry run)
+        if: ${{ inputs.dry_run }}
+        run: npm publish --dry-run --tag "${{ inputs.npm_tag || 'latest' }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
+
+      - name: Publish to npm
+        id: publish
+        if: ${{ !inputs.dry_run && steps.check.outputs.published == 'false' }}
+        run: npm publish --provenance --access public --tag "${{ inputs.npm_tag || 'latest' }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
+
+      - name: Create tag and GitHub release
+        id: release
+        if: ${{ !inputs.dry_run && github.event_name == 'workflow_dispatch' && steps.check.outputs.tagged == 'false' }}
+        run: |
+          gh release create "${{ steps.check.outputs.tag }}" \
+            --target "${{ github.sha }}" \
+            --title "${{ steps.check.outputs.tag }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## ${{ steps.check.outputs.name }} ${{ steps.check.outputs.version }}"
+            echo
+            echo "| Step | Result |"
+            echo "|---|---|"
+            echo "| Mode | ${{ inputs.dry_run && 'dry run' || github.event_name }} |"
+            echo "| npm | ${{ steps.publish.outcome == 'success' && format('published under dist-tag {0}', inputs.npm_tag || 'latest') || steps.check.outputs.published == 'true' && 'already published, skipped' || steps.publish.outcome }} |"
+            echo "| GitHub release | ${{ steps.release.outcome == 'success' && format('created {0}', steps.check.outputs.tag) || steps.check.outputs.tagged == 'true' && 'tag already existed, skipped' || steps.release.outcome }} |"
+            echo
+            echo "https://www.npmjs.com/package/${{ steps.check.outputs.name }}/v/${{ steps.check.outputs.version }}"
+            echo "https://github.com/${{ github.repository }}/releases/tag/${{ steps.check.outputs.tag }}"
+          } >> "$GITHUB_STEP_SUMMARY"
