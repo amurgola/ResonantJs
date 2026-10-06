@@ -159,9 +159,47 @@ res.add('username', true); // same, but also persists to localStorage
 ### Event handling
 
 ```html
-<button res-onclick="editTask">Edit</button>      <!-- receives the current item -->
+<button res-onclick="editTask">Edit</button>      <!-- receives (item, event) -->
+<input res-oninput="onType">                      <!-- any res-on<event>: input, change, keydown, ... -->
 <button res-onclick-remove="id">Delete</button>    <!-- removes item by matching property -->
 ```
+
+Handlers resolve to a global function by default. Register one on the instance instead with `res.handler('open', fn)` and reference it as `res-onclick="res.open"`; a mount can override it with `res-on:open="otherFn"`. Call `res.bindEvents(rootEl)` to wire `res-on*` attributes on static markup outside an array template.
+
+### Reusable templates
+
+```html
+<template id="row"><div><span res-prop="title" res-onclick="res.open"></span></div></template>
+
+<div res="inbox" res-use="row" res-on:open="openMail" res-empty="noMail"></div>
+<div res="archive" res-use="row" res-on:open="openArchived"></div>
+<div res-include="footer"></div>
+```
+
+```js
+res.registerTemplate('row', document.getElementById('row').content.firstElementChild);
+res.registerTemplate('noMail', '<p class="empty">Nothing here</p>');
+res.registerTemplate('footer', '<footer>...</footer>');
+```
+
+`res-use` clones a registered template per array item, `res-empty` shows one while the array is empty, and `res-include` expands one in place (automatically after each `add`, or on demand with `res.processIncludes(rootEl)`).
+
+### Formatting and streaming
+
+```html
+<div res="answer"></div>
+<span res-prop="price" res-format="money"></span>
+```
+
+```js
+res.format('answer', (text, { done }) => markdown(text));   // how a variable renders
+res.transform('money', (v, item) => '$' + v.toFixed(2));     // named res-format transform
+
+const sink = res.stream('answer', { throttle: 16 });        // feed a scalar incrementally
+sink.write('Hello'); sink.write(' world'); sink.rewind(1); sink.end();
+```
+
+`stream()` writes straight to the variable and repaints at most once per throttle window, so a token flood does not re-run the formatter per token. `end()` does the final render and fires callbacks once.
 
 ### Callbacks
 
@@ -284,6 +322,13 @@ Copy this into an `.html` file and open it in your browser.
 | `.addCallback(name, fn)` | Listen for changes. `fn(currentValue, item, action)` |
 | `.computed(name, fn)` | Define a read-only derived value |
 | `.bindByCssSelector(name, selector)` | One-way bind a variable to all elements matching a CSS selector. Also available as `myVar.bindByCssSelector(selector)` on objects and arrays. |
+| `.format(name, fn)` | Register how a top-level scalar renders. `fn(value, { done })` returns HTML. |
+| `.transform(name, fn)` | Register a named transform for `res-format="name"`. `fn(value, item)` returns HTML. |
+| `.stream(name, { throttle?, preserveSelection? })` | Feed a scalar incrementally. Returns a sink with `write(chunk)`, `rewind(n)`, `end()`, `fail(err)`. |
+| `.registerTemplate(name, htmlOrElement)` | Register a reusable markup fragment for `res-use`, `res-empty` and `res-include`. |
+| `.handler(name, fn)` | Register an injectable event handler referenced as `res-onclick="res.name"`. `fn(item, event)` |
+| `.bindEvents(rootEl?, item?)` | Wire `res-on<event>` attributes on static markup. |
+| `.processIncludes(rootEl?)` | Expand `res-include` placeholders under `rootEl` (runs automatically after `add`). |
 
 ### HTML Attributes
 
@@ -293,8 +338,15 @@ Copy this into an `.html` file and open it in your browser.
 | `res-prop="key"` | Bind to an object property within a `res` context |
 | `res-display="expr"` | Show/hide element based on a JS expression |
 | `res-style="expr"` | Apply CSS classes from a JS expression |
-| `res-onclick="fnName"` | Call a global function on click; receives current item if in an array |
+| `res-html` | Write the bound value as HTML instead of text |
+| `res-format="name"` | Run the bound value through a named transform (`transform()` or a global function) before writing |
+| `res-onclick="fnName"` | Call a function on click as `fn(item, event)`. `fnName` is a global, or `res.name` for a handler registered with `handler()` |
+| `res-on<event>="fnName"` | Same as `res-onclick` for `dblclick`, `input`, `change`, `keydown`, `keyup`, `keypress`, `submit`, `blur`, `focus`, `mousedown`, `mouseup` |
+| `res-on:name="fnName"` | On a `res-use` or `res-include` mount, override the `res.name` handler for that mount only |
 | `res-onclick-remove="prop"` | Remove the current item from its parent array by matching property |
+| `res-use="tpl"` | Render each array item from a registered template instead of the element's own markup |
+| `res-empty="tpl"` | Show a registered template while the array is empty |
+| `res-include="tpl"` | Replace the element with a registered template |
 
 ### Array Methods
 

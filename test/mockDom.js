@@ -88,6 +88,29 @@ class MockElement {
     this.children.push(child);
   }
   remove() { if (this.parentElement) { const idx = this.parentElement.children.indexOf(this); if (idx >= 0) this.parentElement.children.splice(idx,1); this.parentElement = null; } }
+  // ── additions for the template features (closest / replaceWith / firstElementChild) ──
+  get firstElementChild() { return this.children[0] || null; }
+  closest(selector) {
+    let node = this;
+    while (node instanceof MockElement) {
+      if (matchesSelector(node, selector)) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }
+  replaceWith(node) {
+    if (!this.parentElement) return;
+    const parent = this.parentElement;
+    const idx = parent.children.indexOf(this);
+    if (idx < 0) return;
+    if (node.parentElement) {
+      const j = node.parentElement.children.indexOf(node);
+      if (j >= 0) node.parentElement.children.splice(j, 1);
+    }
+    node.parentElement = parent;
+    parent.children[idx] = node;
+    this.parentElement = null;
+  }
   cloneNode(deep=true) {
     const clone = new MockElement(this.tagName);
     clone.innerHTML = this.innerHTML;
@@ -114,6 +137,34 @@ class MockDocument {
   createElement(tagName) {
     return new MockElement(tagName);
   }
+}
+
+// Match a single compound selector (classes / tag / [attr] incl. = *= ^=)
+// against one node — used by closest().
+function matchesSelector(node, selector) {
+  selector = selector.trim();
+  const requiredClasses = [];
+  const requiredTag = [];
+  let remaining = selector.replace(/\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g, (_, c) => { requiredClasses.push(c); return ''; });
+  remaining = remaining.replace(/^([a-zA-Z][a-zA-Z0-9]*)/g, (_, t) => { requiredTag.push(t.toUpperCase()); return ''; });
+  const conds = [];
+  const regex = /\[([^\]]+)\]/g;
+  let m;
+  while ((m = regex.exec(remaining)) !== null) {
+    const expr = m[1].trim();
+    const mm = expr.match(/^([^*~^$=]+)(\^=|\*=|=)?"?([^"]*)"?$/);
+    if (mm) conds.push({ name: mm[1], op: mm[2] || null, value: mm[3] !== undefined ? mm[3] : null });
+  }
+  for (const c of requiredClasses) if (!node.classList.contains(c)) return false;
+  for (const t of requiredTag) if (node.tagName !== t) return false;
+  for (const c of conds) {
+    const val = node.getAttribute(c.name);
+    if (c.op === null) { if (val === undefined) return false; }
+    else if (c.op === '=') { if (val !== c.value) return false; }
+    else if (c.op === '*=') { if (!val || !val.includes(c.value)) return false; }
+    else if (c.op === '^=') { if (!val || !val.startsWith(c.value)) return false; }
+  }
+  return !!(conds.length || requiredClasses.length || requiredTag.length);
 }
 
 function querySelectorAllInternal(root, selector) {
