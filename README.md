@@ -376,6 +376,19 @@ Reactive arrays support all standard methods plus:
 - **Computed property chains** -- cascading computed properties resolve in dependency order within a single pass.
 - **Stable keys** -- array items are tracked by stable keys for efficient reuse during re-renders.
 
+### Benchmarks
+
+`bench/` holds a browser benchmark suite that measures what a user actually waits for: wall and CPU time, layout and style-recalc counts, DOM mutations (nodes added or removed, attribute and text changes), rendered element count and retained heap for each scenario, from a 1,000-item render to a streamed token feed. It runs in headless Chromium through Playwright.
+
+```bash
+npx playwright install chromium   # once
+npm run bench                     # benchmark resonant.js
+npm run bench:compare             # A/B this checkout against origin/main
+node bench/run.js --against v1.20 --iterations 9
+```
+
+An A/B run flags any scenario whose DOM mutation or element counts grew as a regression, and reports timing or heap changes beyond 20%. The same comparison runs on every pull request through the Benchmark workflow. Open `bench/benchmark.html` in a browser for a quick in-page run without DevTools metrics. See [bench/README.md](./bench/README.md) for the scenario list and how to add one.
+
 ---
 
 ## Browser Support
@@ -401,6 +414,7 @@ cd ResonantJs
 npm install
 npm test          # run all tests
 npm run build     # run tests + minify
+npm run bench     # browser benchmarks (needs: npx playwright install chromium)
 ```
 
 ---

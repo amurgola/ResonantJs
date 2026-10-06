@@ -15,9 +15,13 @@
   "homepage": "https://github.com/amurgola/ResonantJs#readme",
   "scripts": {
     "test": "node --test",
-    "build": "node scripts/build.js"
+    "build": "node scripts/build.js",
+    "bench": "node bench/run.js",
+    "bench:compare": "node bench/run.js --against origin/main",
+    "bench:baseline": "node bench/run.js --save-baseline"
   },
   "devDependencies": {
+    "playwright": "^1.56.1",
     "terser": "^5.34.1"
   }
 }
