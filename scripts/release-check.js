@@ -8,6 +8,9 @@
 //   node scripts/release-check.js                report only
 //   node scripts/release-check.js --strict       exit 1 when nothing is left to release
 //   node scripts/release-check.js --npm-version  exit 1 unless npm is 11.5.1+ (trusted publishing)
+//   node scripts/release-check.js --oidc-claims  in GitHub Actions: fetch the job's OIDC token for
+//                                                npm and print the claims npm matches against the
+//                                                trusted publisher (repository, workflow, ref ...)
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -35,6 +38,40 @@ if (process.argv.includes('--npm-version')) {
     process.exit(0);
 }
 
+// Trusted publishing fails silently inside npm when the registry rejects the
+// OIDC exchange (npm then falls back to whatever token is configured and the
+// publish dies with a 404). Showing the token's claims makes a mismatch with
+// the npmjs.com trusted publisher obvious. The token itself is never printed.
+function oidcClaims() {
+    const url = process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+    const bearer = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+    if (!url || !bearer) {
+        console.error('No OIDC token is available to this job: the workflow was not granted "id-token: write". '
+            + 'Check the permissions block, then Settings → Actions → General → Workflow permissions, and any organization policy.');
+        process.exit(1);
+    }
+    (async () => {
+        const audience = 'npm:registry.npmjs.org';
+        const res = await fetch(`${url}&audience=${encodeURIComponent(audience)}`, { headers: { Authorization: `bearer ${bearer}` } });
+        if (!res.ok) { console.error(`OIDC token request failed: HTTP ${res.status}`); process.exit(1); }
+        const { value } = await res.json();
+        const payload = JSON.parse(Buffer.from(value.split('.')[1], 'base64url').toString('utf8'));
+        const shown = ['repository', 'repository_owner', 'workflow_ref', 'job_workflow_ref', 'ref', 'environment', 'event_name', 'aud', 'iss'];
+        const rows = shown.map((k) => [k, payload[k] === undefined ? '(absent)' : String(payload[k])]);
+        rows.forEach(([k, v]) => console.log(`${k}=${v}`));
+        if (process.env.GITHUB_STEP_SUMMARY) {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+                '### OIDC claims presented to npm\n\nThe npmjs.com trusted publisher must match these exactly: '
+                + 'organization or user = `repository_owner`, repository = the part of `repository` after the slash, '
+                + 'workflow filename = the file in `workflow_ref`, environment = `environment` (blank if absent).\n\n'
+                + '| Claim | Value |\n|---|---|\n' + rows.map(([k, v]) => `| ${k} | \`${v}\` |`).join('\n') + '\n\n');
+        }
+    })().catch((err) => { console.error('OIDC claims check failed:', err.message); process.exit(1); });
+}
+if (process.argv.includes('--oidc-claims')) { oidcClaims(); } else { main(); }
+
+function main() {
+
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 const version = pkg.version;
 const tag = 'v' + version;
@@ -57,4 +94,5 @@ if (process.env.GITHUB_OUTPUT) {
 if (process.argv.includes('--strict') && published && tagged) {
     console.error(`${pkg.name}@${version} is already on npm and ${tag} already exists: bump the version in package.json first`);
     process.exit(1);
+}
 }

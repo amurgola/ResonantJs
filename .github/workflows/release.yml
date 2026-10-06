@@ -53,15 +53,15 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
           registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
 
       - name: Check npm supports trusted publishing (11.5.1+)
         run: node scripts/release-check.js --npm-version
@@ -82,6 +82,13 @@ jobs:
       - name: Release preflight
         id: check
         run: node scripts/release-check.js --strict
+
+      # Fails when the job has no OIDC token (id-token: write not granted),
+      # otherwise records the claims npm will present so a mismatch with the
+      # npmjs.com trusted publisher is visible in the job summary.
+      - name: Check OIDC token and show its claims
+        if: ${{ !inputs.dry_run && (inputs.auth || 'trusted') == 'trusted' }}
+        run: node scripts/release-check.js --oidc-claims
 
       - name: Publish to npm (dry run)
         if: ${{ inputs.dry_run }}
