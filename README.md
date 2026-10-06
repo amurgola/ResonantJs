@@ -420,6 +420,14 @@ npm run build     # run tests + minify
 npm run bench     # browser benchmarks (needs: npx playwright install chromium)
 ```
 
+### Releasing
+
+1. Bump `version` in `package.json` and `package-lock.json`, run `npm run build`, and commit the rebuilt `resonant.min.js`.
+2. In GitHub, open **Actions → Release → Run workflow**. Tick *dry run* first to see what would happen without publishing.
+3. The workflow runs the test suite, checks the committed minified bundle is current, publishes `resonantjs@<version>` to npm with provenance, and creates a GitHub release tagged `v<version>` with generated notes.
+
+Re-running it is safe: a version already on npm is skipped, an existing tag is skipped, and if both exist it stops and asks for a version bump. Creating a release by hand in the GitHub UI also publishes to npm. `node scripts/release-check.js` shows the same preflight locally.
+
 ---
 
 ## License
