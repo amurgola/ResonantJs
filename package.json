@@ -3,6 +3,12 @@
   "version": "1.3.1",
   "description": "A lightweight JavaScript framework that enables reactive data-binding for building dynamic and responsive web applications. It simplifies creating interactive UIs by automatically updating the DOM when your data changes.",
   "main": "resonant.js",
+  "files": [
+    "resonant.js",
+    "resonant.min.js",
+    "resonant.min.js.map",
+    "aiagent.md"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/amurgola/ResonantJs.git"

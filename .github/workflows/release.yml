@@ -10,6 +10,16 @@
 # Creating a release by hand in the GitHub UI still publishes to npm, as the
 # old workflow did. A release created by this workflow uses the Actions token,
 # which does not trigger workflows, so there is no double publish.
+#
+# Authentication to npm uses trusted publishing (OIDC) by default: no token
+# is stored anywhere, and provenance is attached automatically. One-time
+# setup on npmjs.com: package resonantjs → Settings → Trusted Publisher →
+# GitHub Actions, with user "amurgola", repository "ResonantJs", workflow
+# filename "release.yml" and "npm publish" allowed. Trusted publishing needs
+# npm 11.5.1 or newer, which Node 24 bundles. The "token" auth mode is a
+# fallback that uses the npm_token secret (a granular access token with
+# publish rights; classic tokens were revoked by npm in 2025 and fail with
+# a 404 on publish).
 name: Release
 
 on:
@@ -23,6 +33,11 @@ on:
         description: Build and verify, run npm publish --dry-run, create nothing
         type: boolean
         default: false
+      auth:
+        description: npm authentication (trusted = OIDC trusted publisher, token = npm_token secret)
+        type: choice
+        options: [trusted, token]
+        default: trusted
   release:
     types: [created]
 
@@ -32,7 +47,7 @@ concurrency:
 
 permissions:
   contents: write    # create the tag and release
-  id-token: write    # npm provenance attestation
+  id-token: write    # OIDC token for npm trusted publishing and provenance
 
 jobs:
   release:
@@ -44,9 +59,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org/
+
+      - name: Check npm supports trusted publishing (11.5.1+)
+        run: node scripts/release-check.js --npm-version
 
       - run: npm ci
 
@@ -64,18 +82,21 @@ jobs:
       - name: Release preflight
         id: check
         run: node scripts/release-check.js --strict
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
 
       - name: Publish to npm (dry run)
         if: ${{ inputs.dry_run }}
-        run: npm publish --dry-run --tag "${{ inputs.npm_tag || 'latest' }}"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
+        run: npm publish --dry-run --access public --tag "${{ inputs.npm_tag || 'latest' }}"
 
-      - name: Publish to npm
+      # Trusted publishing: npm exchanges the job's OIDC token for a
+      # short-lived registry credential and attaches provenance itself.
+      - name: Publish to npm (trusted publishing)
         id: publish
-        if: ${{ !inputs.dry_run && steps.check.outputs.published == 'false' }}
+        if: ${{ !inputs.dry_run && steps.check.outputs.published == 'false' && (inputs.auth || 'trusted') == 'trusted' }}
+        run: npm publish --access public --tag "${{ inputs.npm_tag || 'latest' }}"
+
+      - name: Publish to npm (token)
+        id: publish_token
+        if: ${{ !inputs.dry_run && steps.check.outputs.published == 'false' && inputs.auth == 'token' }}
         run: npm publish --provenance --access public --tag "${{ inputs.npm_tag || 'latest' }}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
@@ -100,7 +121,8 @@ jobs:
             echo "| Step | Result |"
             echo "|---|---|"
             echo "| Mode | ${{ inputs.dry_run && 'dry run' || github.event_name }} |"
-            echo "| npm | ${{ steps.publish.outcome == 'success' && format('published under dist-tag {0}', inputs.npm_tag || 'latest') || steps.check.outputs.published == 'true' && 'already published, skipped' || steps.publish.outcome }} |"
+            echo "| Auth | ${{ inputs.auth || 'trusted' }} |"
+            echo "| npm | ${{ (steps.publish.outcome == 'success' || steps.publish_token.outcome == 'success') && format('published under dist-tag {0}', inputs.npm_tag || 'latest') || steps.check.outputs.published == 'true' && 'already published, skipped' || inputs.auth == 'token' && steps.publish_token.outcome || steps.publish.outcome }} |"
             echo "| GitHub release | ${{ steps.release.outcome == 'success' && format('created {0}', steps.check.outputs.tag) || steps.check.outputs.tagged == 'true' && 'tag already existed, skipped' || steps.release.outcome }} |"
             echo
             echo "https://www.npmjs.com/package/${{ steps.check.outputs.name }}/v/${{ steps.check.outputs.version }}"
