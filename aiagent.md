@@ -28,7 +28,7 @@ ResonantJs adds reactive data-binding to vanilla HTML/JS pages. One `<script>` t
 | `computed` | `computed(name, fn)` | Define a read-only derived value. Dependencies are tracked automatically. Chains are supported (computed A depending on computed B). |
 | `format` | `format(name, fn)` | Register how a top-level scalar renders. `fn(value, { done })` returns an HTML string written via `innerHTML`. |
 | `transform` | `transform(name, fn)` | Register a named value transform for `res-format="name"`. `fn(value, item)` returns an HTML string. Falls back to `window[name]` when unregistered. |
-| `stream` | `stream(name, { throttle?, preserveSelection? })` | Feed a top-level scalar incrementally. Returns a sink: `write(chunk)`, `rewind(n)`, `end()`, `fail(err)`. Repaints are throttled; `end()` renders once and fires callbacks once. |
+| `stream` | `stream(name, { throttle?, preserveSelection?, patch? })` | Feed a top-level scalar incrementally. Returns a sink: `write(chunk)`, `rewind(n)`, `end()`, `fail(err)`. Repaints are throttled; `end()` renders once and fires callbacks once. `patch(el, html)` writes a flush yourself instead of `innerHTML` (a non-destructive repaint). |
 | `registerTemplate` | `registerTemplate(name, htmlOrElement)` | Register a reusable markup fragment (with `res-*` bindings inside) for `res-use`, `res-empty` and `res-include`. |
 | `handler` | `handler(name, fn)` | Register an injectable handler used by `res-onclick="res.name"`. `fn(item, event)`. A mount can override it with `res-on:name="globalFn"`. |
 | `bindEvents` | `bindEvents(rootEl?, item?)` | Wire `res-on<event>` attributes on static markup that is not part of an array template. |

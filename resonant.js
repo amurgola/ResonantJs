@@ -1408,7 +1408,14 @@
             const fmt = fmtName ? this._resolveFormat(fmtName) : null;
             if (fmt) { el.innerHTML = String(fmt(value, item) ?? ''); return; }
             const named = variableName ? this._formatters[variableName] : null;
-            if (named) { el.innerHTML = named(value ?? '', meta || { done: true }); return; }
+            if (named) {
+                const html = named(value ?? '', meta || { done: true });
+                // A stream's patch(el, html) writes the formatted HTML itself (a
+                // non-destructive repaint that keeps settled nodes in place).
+                if (meta && typeof meta.patch === 'function') meta.patch(el, html);
+                else el.innerHTML = html;
+                return;
+            }
             if (el.hasAttribute('res-html')) el.innerHTML = value ?? '';
             else el.textContent = value ?? '';
         }
@@ -1489,9 +1496,12 @@
             }
             const throttle = Number(opts.throttle) || 0;
             const preserveSelection = opts.preserveSelection !== false;
+            // opts.patch(el, html): how each flush writes the formatted HTML into a
+            // bound element, instead of el.innerHTML = html.
+            const patch = typeof opts.patch === 'function' ? opts.patch : null;
             const st = this._streams[variableName] = {
                 raw: String(this.data[variableName] ?? ''),
-                throttle, preserveSelection, timer: null,
+                throttle, preserveSelection, patch, timer: null,
             };
             const schedule = () => {
                 if (st.timer) return;
@@ -1526,7 +1536,7 @@
             }
             elements.forEach(el => {
                 if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') { el.value = raw; return; }
-                this._writeValue(el, raw, variableName, null, { done: final });
+                this._writeValue(el, raw, variableName, null, { done: final, patch: st ? st.patch : null });
             });
         }
 

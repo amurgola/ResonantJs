@@ -89,3 +89,19 @@ test('stream() end does a final flush (ignoring throttle) and clears state', () 
   assert.strictEqual(span.innerHTML, 'done', 'end() flushes immediately, not after the throttle');
   assert.strictEqual(resonant._streams['answer'], undefined, 'stream record cleared');
 });
+
+test('stream() hands each flush to opts.patch instead of innerHTML', async () => {
+  const { root, span } = scalarRoot();
+  const { resonant } = makeResonant(root);
+  resonant.add('answer', '');
+  resonant.format('answer', (v) => '<p>' + v + '</p>');
+  const patched = [];
+  const sink = resonant.stream('answer', { throttle: 10, patch: (el, html) => patched.push([el, html]) });
+  sink.write('abc');
+  await sleep(20);
+  assert.deepStrictEqual(patched, [[span, '<p>abc</p>']]);
+  assert.strictEqual(span.innerHTML, '<p></p>', 'unchanged since add(): the element is left to the patch function');
+  sink.end();
+  assert.strictEqual(patched.length, 2, 'the final render goes through the same patch');
+  assert.strictEqual(patched[1][1], '<p>abc</p>');
+});

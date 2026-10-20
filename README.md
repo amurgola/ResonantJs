@@ -201,7 +201,7 @@ const sink = res.stream('answer', { throttle: 16 });        // feed a scalar inc
 sink.write('Hello'); sink.write(' world'); sink.rewind(1); sink.end();
 ```
 
-`stream()` writes straight to the variable and repaints at most once per throttle window, so a token flood does not re-run the formatter per token. `end()` does the final render and fires callbacks once.
+`stream()` writes straight to the variable and repaints at most once per throttle window, so a token flood does not re-run the formatter per token. `end()` does the final render and fires callbacks once. Pass `patch: (el, html) => ...` to write each flush yourself, for instance replacing only the trailing nodes that changed so a long answer's settled paragraphs keep their DOM nodes.
 
 ### Callbacks
 
@@ -327,7 +327,7 @@ Copy this into an `.html` file and open it in your browser.
 | `.bindByCssSelector(name, selector)` | One-way bind a variable to all elements matching a CSS selector. Also available as `myVar.bindByCssSelector(selector)` on objects and arrays. |
 | `.format(name, fn)` | Register how a top-level scalar renders. `fn(value, { done })` returns HTML. |
 | `.transform(name, fn)` | Register a named transform for `res-format="name"`. `fn(value, item)` returns HTML. |
-| `.stream(name, { throttle?, preserveSelection? })` | Feed a scalar incrementally. Returns a sink with `write(chunk)`, `rewind(n)`, `end()`, `fail(err)`. |
+| `.stream(name, { throttle?, preserveSelection?, patch? })` | Feed a scalar incrementally. Returns a sink with `write(chunk)`, `rewind(n)`, `end()`, `fail(err)`. `patch(el, html)` writes a flush instead of `innerHTML`. |
 | `.registerTemplate(name, htmlOrElement)` | Register a reusable markup fragment for `res-use`, `res-empty` and `res-include`. |
 | `.handler(name, fn)` | Register an injectable event handler referenced as `res-onclick="res.name"`. `fn(item, event)` |
 | `.bindEvents(rootEl?, item?)` | Wire `res-on<event>` attributes on static markup. |
